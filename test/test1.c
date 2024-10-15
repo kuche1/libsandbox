@@ -11,7 +11,7 @@ int main(void){
     char * command = "echo";
 
     char * command_args [] = {
-        "hui 123",
+        "asd 123",
         "4567",
         NULL,
     };
