@@ -7,12 +7,12 @@ HERE=$(dirname "$BASH_SOURCE")
 COMPILER='gcc'
 
 FLAGS_STANDARD='-std=c99'
+# `std99` doesn't allow for `kill`
 
 FLAGS_STRICT='-Werror -Wextra -Wall -pedantic -Wfatal-errors -Wshadow'
 
-FLAGS_LIBRARIES='-lseccomp -lboost_system -lboost_filesystem'
+FLAGS_LIBRARIES='-lseccomp'
 # note that we can't have both `-static` and `-lseccomp`
-FLAGS_LIBRARIES=''
 
 FLAGS_OPTIMISATION='-Ofast'
 

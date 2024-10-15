@@ -6,13 +6,43 @@
 #include <stdio.h> // fprintf
 #include <signal.h> // raise
 #include <sys/wait.h> // waitpid
+#include <seccomp.h> // scmp_filter_ctx
 
 #define LIBSANDBOX_ERR_PREFIX LIBSANDBOX_PRINT_PREFIX "ERROR: "
 
-static void sigkill_or_print_err(pid_t pid){
+static inline void sigkill_or_print_err(pid_t pid){
     if(kill(pid, SIGKILL)){
         fprintf(stderr, LIBSANDBOX_ERR_PREFIX "could not SIGKILL process with pid `%d`\n", pid);
     }
+}
+
+static inline int set_seccomp_rules(void){
+
+    // SCMP_ACT_ALLOW - allow the syscall
+    // SCMP_ACT_LOG - allow but log
+    // SCMP_ACT_TRACE(69) - trigger a ptrace breakpoint
+
+    // allow all syscalls by default
+    scmp_filter_ctx ctx = seccomp_init(SCMP_ACT_ALLOW);
+    if(ctx == NULL){
+        fprintf(stderr, LIBSANDBOX_ERR_PREFIX "could not initialise seccomp\n");
+        return -1;
+    }
+
+    // do not send SIGSYS upon coming across an invalid syscall (fix for proton)
+    if(seccomp_attr_set(ctx, SCMP_FLTATR_ACT_BADARCH, SCMP_ACT_ALLOW)){
+        fprintf(stderr, LIBSANDBOX_ERR_PREFIX "could set seccomp attribute\n");
+        return -1;
+    }
+
+    // load the rules
+    if(seccomp_load(ctx)){
+        fprintf(stderr, LIBSANDBOX_ERR_PREFIX "could not load seccomp rules\n");
+        return -1;
+    }
+
+    return 0;
+
 }
 
 int libsandbox_fork(char * command, char * * command_args, pid_t * new_process_pid){
@@ -36,8 +66,9 @@ int libsandbox_fork(char * command, char * * command_args, pid_t * new_process_p
             return -1;
         }
 
-        // set_static_rules(settings);
-        // TODO
+        if(set_seccomp_rules()){
+            return -1;
+        }
 
         execvp(command, command_args);
         // no need to check return code, if the execution continues the call has failed for sure

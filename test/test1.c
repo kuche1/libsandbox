@@ -2,6 +2,7 @@
 #include "../src/libsandbox.h"
 
 #include <stdio.h>
+#include <unistd.h> // sleep
 
 int main(void){
 
@@ -21,6 +22,8 @@ int main(void){
     }
 
     printf("forked successfully\n");
+
+    sleep(5);
 
     return 0;
 }

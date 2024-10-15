@@ -11,8 +11,6 @@ FLAGS_STANDARD='-std=gnu99'
 
 FLAGS_STRICT='-Werror -Wextra -Wall -pedantic -Wfatal-errors -Wshadow'
 
-FLAGS_LIBRARIES='-lseccomp -lboost_system -lboost_filesystem'
-# note that we can't have both `-static` and `-lseccomp`
 FLAGS_LIBRARIES=''
 
 FLAGS_OPTIMISATION='-Ofast'
