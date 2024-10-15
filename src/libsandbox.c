@@ -45,7 +45,12 @@ static inline int set_seccomp_rules(void){
 
 }
 
-int libsandbox_fork(char * command, char * * command_args, pid_t * new_process_pid){
+int libsandbox_fork(char * * command_argv, pid_t * new_process_pid){
+
+    if(command_argv[0] == NULL){
+        fprintf(stderr, LIBSANDBOX_ERR_PREFIX "command name not specified\n");
+        return -1;
+    }
 
     pid_t child = fork();
 
@@ -70,10 +75,10 @@ int libsandbox_fork(char * command, char * * command_args, pid_t * new_process_p
             return -1;
         }
 
-        execvp(command, command_args);
+        execvp(command_argv[0], command_argv);
         // no need to check return code, if the execution continues the call has failed for sure
 
-        fprintf(stderr, LIBSANDBOX_ERR_PREFIX "call to execvp failed: could not run `%s`\n", command);
+        fprintf(stderr, LIBSANDBOX_ERR_PREFIX "call to execvp failed: could not run `%s`\n", command_argv[0]);
 
         return -1;
 
