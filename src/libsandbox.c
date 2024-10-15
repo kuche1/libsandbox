@@ -35,6 +35,8 @@ static inline int set_seccomp_rules(void){
         return -1;
     }
 
+    // TODO actually add those filters
+
     // load the rules
     if(seccomp_load(ctx)){
         fprintf(stderr, LIBSANDBOX_ERR_PREFIX "could not load seccomp rules\n");
@@ -125,6 +127,114 @@ int libsandbox_fork(char * * command_argv, pid_t * new_process_pid){
     }
 
     * new_process_pid = child;
+
+    return 0;
+
+}
+
+int libsandbox_next_syscall(pid_t sandboxed_process_pid, int * finished, int * return_code, int * processes_running, int * processes_failed){
+
+    int status;
+    pid_t pid = waitpid(-1, &status, 0);
+    // the first argument being -1 means: wait for any child process
+    // `waitpid` returns when a child's state changes, and that means: the child terminated, the child was stopped by a signal, or the child was resumed by a signal
+
+    if(pid == -1){
+        // we're never supposed to reach this
+        fprintf(stderr, LIBSANDBOX_ERR_PREFIX "WTF something is wrong\n");
+        * finished = 1;
+        return 0;
+    }
+
+    if(
+        ( status>>8 == (SIGTRAP | (PTRACE_EVENT_CLONE<<8)) ) ||
+        ( status>>8 == (SIGTRAP | (PTRACE_EVENT_FORK<<8))  ) ||
+        ( status>>8 == (SIGTRAP | (PTRACE_EVENT_VFORK<<8)) )
+    ){
+
+        // new process was created
+        * processes_running += 1;
+        if(ptrace(PTRACE_CONT, pid, NULL, NULL)){
+            fprintf(stderr, LIBSANDBOX_ERR_PREFIX "could not PTRACE_CONT\n");
+            return 1;
+        }
+        return 0;
+
+    }else if(
+        status>>8 == (SIGTRAP | (PTRACE_EVENT_EXIT<<8))
+    ){
+
+        // process died
+
+        * processes_running -= 1;
+
+        unsigned long event_message;
+        if(ptrace(PTRACE_GETEVENTMSG, pid, NULL, &event_message)){
+            fprintf(stderr, LIBSANDBOX_ERR_PREFIX "could not PTRACE_GETEVENTMSG\n");
+            return 1;
+        }
+
+        int code = event_message >> 8;
+
+        if(code){
+            // note that it might be the case that the return code signifies something else
+            // rather than success/failure
+            * processes_failed += 1;
+        }
+
+        if(pid == sandboxed_process_pid){
+            * return_code = code;
+        }
+
+        if(ptrace(PTRACE_CONT, pid, NULL, NULL)){
+            fprintf(stderr, LIBSANDBOX_ERR_PREFIX "could not PTRACE_CONT\n");
+            return 1;
+        }
+
+        if(* processes_running <= 0){
+            * finished = 1;
+        }
+
+        return 0;
+
+    }else if(
+        status>>8 == (SIGTRAP | (PTRACE_EVENT_SECCOMP<<8))
+    ){
+
+        // generic syscall that we need to filter
+
+    }else{
+
+        if(!WIFSTOPPED(status)){
+            // WIFSTOPPED(status): returns true if the child process was stopped by delivery of a signal; this is only possible if the call was done using WUNTRACED or when the child is being traced
+            // so, this was NOT caused by us, and using PTRACE_CONT will do nothing and fail
+            return 0;
+        }
+
+        // TODO wtf is this
+        if(WSTOPSIG(status) == SIGTRAP){
+            if(ptrace(PTRACE_CONT, pid, NULL, NULL)){
+                fprintf(stderr, LIBSANDBOX_ERR_PREFIX "could not PTRACE_CONT\n");
+                return 1;
+            }
+            return 0;
+        }
+
+        // forward the signal to the child
+        if(ptrace(PTRACE_CONT, pid, NULL, WSTOPSIG(status))){
+            fprintf(stderr, LIBSANDBOX_ERR_PREFIX "could not PTRACE_CONT\n");
+            return 1;
+        }
+
+        return 0;
+
+    }
+
+    // TODO the code for the filtering should go here
+    if(ptrace(PTRACE_CONT, pid, NULL, NULL)){
+        fprintf(stderr, LIBSANDBOX_ERR_PREFIX "could not PTRACE_CONT\n");
+        return 1;
+    }
 
     return 0;
 
