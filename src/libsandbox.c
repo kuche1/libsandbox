@@ -139,11 +139,15 @@ int libsandbox_next_syscall(pid_t sandboxed_process_pid, int * finished, int * r
     // the first argument being -1 means: wait for any child process
     // `waitpid` returns when a child's state changes, and that means: the child terminated, the child was stopped by a signal, or the child was resumed by a signal
 
+    // if(pid == -1){
+    //     // we're never supposed to reach this
+    //     fprintf(stderr, LIBSANDBOX_ERR_PREFIX "WTF something is wrong\n");
+    //     * finished = 1;
+    //     return 0;
+    // }
     if(pid == -1){
-        // we're never supposed to reach this
-        fprintf(stderr, LIBSANDBOX_ERR_PREFIX "WTF something is wrong\n");
-        * finished = 1;
-        return 0;
+        fprintf(stderr, LIBSANDBOX_ERR_PREFIX "call to waitpid failed\n");
+        return 1;
     }
 
     if(
