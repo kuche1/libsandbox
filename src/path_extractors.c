@@ -197,15 +197,17 @@ static ssize_t extract_pathlink_pidmemdirfd(pid_t pid, int pidmem_dirfd, char * 
 ////////// high level
 //////////
 
-static int extract_arg0pathlink(pid_t pid, struct user_regs_struct * cpu_regs, char * path, size_t path_size){
+// all these functions return (negative on error) or (the number of paths extracted)
+
+static int extract_arg0pathlink(pid_t pid, struct user_regs_struct * cpu_regs, size_t path_size, char * path0, __attribute__((unused)) char * path1){
     char * pidmem_str = (char *) CPU_REG_R_SYSCALL_ARG0(* cpu_regs);
-    if(extract_pathlink_pidmemstr(pid, pidmem_str, path, path_size) < 0){
-        return 1;
+    if(extract_pathlink_pidmemstr(pid, pidmem_str, path0, path_size) < 0){
+        return -1;
     }
-    return 0;
+    return 1;
 }
 
-static int extract_arg0dirfd_arg1pathlink(pid_t pid, struct user_regs_struct * cpu_regs, char * path, size_t path_size){
+static int extract_arg0dirfd_arg1pathlink(pid_t pid, struct user_regs_struct * cpu_regs, size_t path_size, char * path0, __attribute__((unused)) char * path1){
 
     // extract file
 
@@ -217,45 +219,68 @@ static int extract_arg0dirfd_arg1pathlink(pid_t pid, struct user_regs_struct * c
 
     if(filename_len < 0){
         fprintf(stderr, ERR_PREFIX "not enough memory in buffer\n");
-        return 1;
+        return -1;
     }
 
     if(filename[0] == '/'){
         // it's a full path
-        strcpy(path, filename);
-        return 0;
+        strcpy(path0, filename);
+        return 1;
     }
 
     // extract folder
 
     int pidmem_dirfd = CPU_REG_R_SYSCALL_ARG0(* cpu_regs);
 
-    ssize_t path_len_ssize = extract_pathlink_pidmemdirfd(pid, pidmem_dirfd, path, path_size);
+    ssize_t path_len_ssize = extract_pathlink_pidmemdirfd(pid, pidmem_dirfd, path0, path_size);
 
     if(path_len_ssize < 0){
-        return 1;
+        return -1;
     }
 
     size_t path_len = path_len_ssize;
 
     // add separator
 
-    path[path_len] = '/';
+    path0[path_len] = '/';
     path_len += 1;
 
     if(path_len >= path_size){
         fprintf(stderr, ERR_PREFIX "not enough memory in buffer\n");
-        return 1;
+        return -1;
     }
 
     // add file
 
     if(path_len + filename_len + 1 >= path_size){
         fprintf(stderr, ERR_PREFIX "not enough memory in buffer\n");
-        return 1;
+        return -1;
     }
 
-    strcpy(path + path_len, filename);
+    strcpy(path0 + path_len, filename);
 
-    return 0;
+    return 1;
+}
+
+// TODO untested
+static int extract_arg0pathlink_arg1pathlink(pid_t pid, struct user_regs_struct * cpu_regs, size_t path_size, char * path0, char * path1){
+
+    // extract path0
+
+    char * pidmem_str0 = (char *) CPU_REG_R_SYSCALL_ARG0(* cpu_regs);
+
+    if(extract_pathlink_pidmemstr(pid, pidmem_str0, path0, path_size) < 0){
+        return -1;
+    }
+
+    // extract path1
+
+    char * pidmem_str1 = (char *) CPU_REG_R_SYSCALL_ARG1(* cpu_regs);
+
+    if(extract_pathlink_pidmemstr(pid, pidmem_str1, path1, path_size) < 0){
+        return -1;
+    }
+
+    return 2;
+
 }

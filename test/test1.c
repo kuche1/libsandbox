@@ -35,6 +35,13 @@ int main(void){
         NULL,
     };
 
+    // char * command_argv [] = {
+    //     "bash",
+    //     "-c",
+    //     "ln -s a b",
+    //     NULL,
+    // };
+
     struct libsandbox_rules rules;
     libsandbox_rules_init(& rules, 0); // `1` stands for permissive, `0` for non-permissive
     rules.filesystem_allow_metadata = 1;
@@ -51,11 +58,13 @@ int main(void){
 
     struct libsandbox_summary summary = {0}; // TODO the user should not be responsible for this
 
-    char path[400];
+    size_t size_path = 400;
+    char path0[size_path];
+    char path1[size_path];
 
     for(int running = 1; running;){
 
-        switch(libsandbox_next_syscall(ctx_private, & summary, path, sizeof(path))){
+        switch(libsandbox_next_syscall(ctx_private, & summary, size_path, path0, path1)){
 
             case LIBSANDBOX_RESULT_FINISHED:{
                 running = 0;
@@ -66,8 +75,13 @@ int main(void){
                 return 1;
             }break;
 
-            case LIBSANDBOX_RESULT_ACCESS_ATTEMPT_PATH:{
-                printf("attempt to access path `%s`\n", path);
+            case LIBSANDBOX_RESULT_ACCESS_ATTEMPT_PATH0:{
+                printf("attempt to access path `%s`\n", path0);
+                libsandbox_syscall_allow(ctx_private);
+            }break;
+
+            case LIBSANDBOX_RESULT_ACCESS_ATTEMPT_PATH0_PATH1:{
+                printf("attempt to access paths `%s` and `%s`\n", path0, path1);
                 libsandbox_syscall_allow(ctx_private);
             }break;
 

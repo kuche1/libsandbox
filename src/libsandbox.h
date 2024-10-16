@@ -8,7 +8,8 @@
 enum libsandbox_result{
     LIBSANDBOX_RESULT_FINISHED = 0,
     LIBSANDBOX_RESULT_ERROR,
-    LIBSANDBOX_RESULT_ACCESS_ATTEMPT_PATH,
+    LIBSANDBOX_RESULT_ACCESS_ATTEMPT_PATH0,
+    LIBSANDBOX_RESULT_ACCESS_ATTEMPT_PATH0_PATH1,
 };
 
 struct libsandbox_summary{
@@ -34,4 +35,5 @@ int libsandbox_syscall_allow(void * ctx_private);
 int libsandbox_syscall_deny(void * ctx_private);
 // called after `libsandbox_next_syscall` to signify access
 
-enum libsandbox_result libsandbox_next_syscall(void * ctx_private, struct libsandbox_summary * summary, char * access_attempt_path, size_t access_attempt_path_size);
+enum libsandbox_result libsandbox_next_syscall(void * ctx_private, struct libsandbox_summary * summary, size_t path_size, char * path0, char * path1);
+// `path0` and `path1` need to be buffers of size `path_size` each

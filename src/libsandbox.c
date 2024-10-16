@@ -327,7 +327,7 @@ int libsandbox_syscall_deny(void * ctx_private){
 
 // TODO? make it so that if this exits with LIBSANDBOX_RESULT_ERROR it kills all processes
 // perhaps do it also when finished just to be sure?
-enum libsandbox_result libsandbox_next_syscall(void * ctx_private, struct libsandbox_summary * summary, char * access_attempt_path, size_t access_attempt_path_size){
+enum libsandbox_result libsandbox_next_syscall(void * ctx_private, struct libsandbox_summary * summary, size_t path_size, char * path0, char * path1){
     struct ctx_private * ctx_priv = ctx_private;
 
     for(;;){
@@ -445,7 +445,7 @@ enum libsandbox_result libsandbox_next_syscall(void * ctx_private, struct libsan
         ctx_priv->evaluated_syscall_id = CPU_REG_RW_SYSCALL_ID(ctx_priv->evaluated_cpu_regs);
 
         // functon pointer
-        int (*path_extractor_fnc)(pid_t, struct user_regs_struct *, char *, size_t);
+        int (*path_extractor_fnc)(pid_t, struct user_regs_struct *, size_t, char *, char *);
 
         switch(ctx_priv->evaluated_syscall_id){
 
@@ -486,6 +486,17 @@ enum libsandbox_result libsandbox_next_syscall(void * ctx_private, struct libsan
                     path_extractor_fnc = extract_arg0dirfd_arg1pathlink;
                 }break;
 
+                case SYS_rename:
+                case SYS_link:
+                case SYS_symlink:{
+                    path_extractor_fnc = extract_arg0pathlink_arg1pathlink;
+                }break;
+
+                // TODO
+                // case SYS_symlink:{
+                //     path_extractor_fnc = extract_arg0pathlinkA_arg1dirfdB_arg2pathlinkB;
+                // }break;
+
             default:{
                 const char * name = get_syscall_name(ctx_priv->evaluated_syscall_id);
                 fprintf(stderr, ERR_PREFIX "unknown syscal with id `%ld` (%s); this is a bug that needs to be reported\n", ctx_priv->evaluated_syscall_id, name);
@@ -494,16 +505,29 @@ enum libsandbox_result libsandbox_next_syscall(void * ctx_private, struct libsan
 
         }
 
-        if(path_extractor_fnc(ctx_priv->root_process_pid, & ctx_priv->evaluated_cpu_regs, access_attempt_path, access_attempt_path_size)){
+        int bufferes_used = path_extractor_fnc(ctx_priv->root_process_pid, & ctx_priv->evaluated_cpu_regs, path_size, path0, path1);
+
+        if(bufferes_used < 0){
+
             summary->auto_blocked_syscalls += 1;
             if(libsandbox_syscall_deny(ctx_priv)){
                 fprintf(stderr, ERR_PREFIX "unable to automatically block syscall\n");
                 return LIBSANDBOX_RESULT_ERROR;
             }
             continue;
+
+        }else if(bufferes_used == 1){
+
+            return LIBSANDBOX_RESULT_ACCESS_ATTEMPT_PATH0;
+
+        }else if(bufferes_used == 2){
+
+            return LIBSANDBOX_RESULT_ACCESS_ATTEMPT_PATH0_PATH1;
+
         }
 
-        return LIBSANDBOX_RESULT_ACCESS_ATTEMPT_PATH;
+        fprintf(stderr, ERR_PREFIX "unknown return value of `path_extractor_fnc` (%d); this is a bug that needs to be reported\n", bufferes_used);
+        return LIBSANDBOX_RESULT_ERROR;
 
     }
 
