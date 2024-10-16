@@ -11,6 +11,7 @@
 #include <errno.h> // errno
 #include <sys/user.h> // user_regs_struct
 #include <sys/syscall.h> // SYS_*
+#include <fcntl.h> // AT_FDCWD
 
 #define PRINT_PREFIX LIBSANDBOX_PRINT_PREFIX
 #define ERR_PREFIX PRINT_PREFIX "ERROR: "

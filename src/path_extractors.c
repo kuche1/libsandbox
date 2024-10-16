@@ -1,6 +1,10 @@
 
 // TODO ideally we would only dereference a symlink if the given syscall does so as well
 
+//////////
+////////// low level
+//////////
+
 static int extract_pathraw_addr(pid_t pid, char * addr, char * path, size_t path_size){
 
     for(;;){
@@ -44,13 +48,7 @@ static int extract_pathraw_addr(pid_t pid, char * addr, char * path, size_t path
 
 }
 
-static int extract_pathraw_pidmemstr(pid_t pid, char * pidmem_str, char * path, size_t path_size){
-
-    char path_raw[path_size];
-
-    if(extract_pathraw_addr(pid, pidmem_str, path_raw, sizeof(path_raw))){
-        return 1;
-    }
+static int extract_pathlink(char * path_raw, char * path, size_t path_size){
 
     if(path_size <= 0){
         fprintf(stderr, ERR_PREFIX "provided buffer size is <= 0\n");
@@ -79,23 +77,127 @@ static int extract_pathraw_pidmemstr(pid_t pid, char * pidmem_str, char * path, 
 
 }
 
+static int extract_pathlink_pidmemstr(pid_t pid, char * pidmem_str, char * path, size_t path_size){
+
+    char path_raw[path_size];
+
+    if(extract_pathraw_addr(pid, pidmem_str, path_raw, sizeof(path_raw))){
+        return 1;
+    }
+
+    return extract_pathlink(path_raw, path, path_size);
+
+}
+
+static int extract_pathlink_pidmemdirfd(pid_t pid, int pidmem_dirfd, char * path, size_t path_size){
+
+    char file_containing_dirfd[100];
+
+    int written;
+
+    if(pidmem_dirfd == AT_FDCWD){
+        written = snprintf(file_containing_dirfd, sizeof(file_containing_dirfd), "/proc/%d/cwd", pid);
+    }else{
+        written = snprintf(file_containing_dirfd, sizeof(file_containing_dirfd), "/proc/%d/fd/%d", pid, pidmem_dirfd);
+    }
+
+    if(written < 0){
+        fprintf(stderr, ERR_PREFIX "`snprintf` failure\n");
+        return 1;
+    }
+
+    if((long unsigned int) written >= sizeof(file_containing_dirfd)){
+        fprintf(stderr, ERR_PREFIX "not enough memory in temporary buffer; this is a bug that needs to be reported\n");
+        return 1;
+    }
+
+    if(pidmem_dirfd == AT_FDCWD){
+
+        return extract_pathlink(file_containing_dirfd, path, path_size);
+
+    }else{
+
+        printf("DBG: YEEEEE");
+        // TODO this print is here since this branch has been
+        // totally untested
+
+        FILE * f = fopen(file_containing_dirfd, "rb");
+        if(!f){
+            fprintf(stderr, ERR_PREFIX "could not open file containing dirfd `%s`\n", file_containing_dirfd);
+            return 1;
+        }
+
+        if(fseek(f, 0, SEEK_END)){
+            fprintf(stderr, ERR_PREFIX "`fseek` failure\n");
+            fclose(f);
+            return 1;
+        }
+
+        long actual_path_size = ftell(f);
+
+        if(actual_path_size < 0){
+            fprintf(stderr, ERR_PREFIX "`ftell` failure\n");
+            fclose(f);
+            return 1;
+        }
+
+        rewind(f);
+
+        if(path_size <= 0){
+            fprintf(stderr, ERR_PREFIX "provided buffer size is <= 0\n");
+            fclose(f);
+            return 1;
+        }
+
+        if((size_t) actual_path_size > path_size - 1){
+            fprintf(stderr, ERR_PREFIX "not enough memory for the actual path (a)\n");
+            fclose(f);
+            return 1;
+        }
+
+        size_t read = fread(path, 1, path_size - 1, f);
+
+        if(read != (size_t) actual_path_size){
+            fprintf(stderr, ERR_PREFIX "not enough memory for the actual path (b) [DBG: %lu != %lu]\n", read, actual_path_size);
+            fclose(f);
+            return 1;
+        }
+
+        fclose(f);
+
+        path[read] = 0;
+
+        return 0;
+
+    }
+
+}
+
+//////////
+////////// high level
+//////////
+
 static int extract_arg0pathlink(pid_t pid, struct user_regs_struct * cpu_regs, char * path, size_t path_size){
     char * pidmem_str = (char *) CPU_REG_R_SYSCALL_ARG0(* cpu_regs);
-    return extract_pathraw_pidmemstr(pid, pidmem_str, path, path_size);
+    return extract_pathlink_pidmemstr(pid, pidmem_str, path, path_size);
 }
 
 static int extract_arg0dirfd_arg1pathlink(pid_t pid, struct user_regs_struct * cpu_regs, char * path, size_t path_size){
 
-    // int dir_fd = CPU_REG_R_SYSCALL_ARG0(* cpu_regs);
-    // TODO
+    int pidmem_dirfd = CPU_REG_R_SYSCALL_ARG0(* cpu_regs);
 
-    char * pidmem_str = (char *) CPU_REG_R_SYSCALL_ARG1(* cpu_regs);
-
-    if(extract_pathraw_addr(pid, pidmem_str, path, path_size)){
+    if(extract_pathlink_pidmemdirfd(pid, pidmem_dirfd, path, path_size)){
         return 1;
     }
 
-    // TODO follow the path symlink
+    // TODO glue to the path now
+    // keep in mind that it might be a full path
+
+    // char * pidmem_str = (char *) CPU_REG_R_SYSCALL_ARG1(* cpu_regs);
+
+    // if(extract_pathraw_addr(pid, pidmem_str, path, path_size)){
+    //     return 1;
+    // }
 
     return 0;
 }
