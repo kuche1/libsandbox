@@ -34,13 +34,13 @@ static inline int set_seccomp_rules(void){
     scmp_filter_ctx ctx = seccomp_init(SCMP_ACT_ALLOW);
     if(ctx == NULL){
         fprintf(stderr, LIBSANDBOX_ERR_PREFIX "could not initialise seccomp\n");
-        return -1;
+        return 1;
     }
 
     // do not send SIGSYS upon coming across an invalid syscall (fix for proton)
     if(seccomp_attr_set(ctx, SCMP_FLTATR_ACT_BADARCH, SCMP_ACT_ALLOW)){
         fprintf(stderr, LIBSANDBOX_ERR_PREFIX "could set seccomp attribute\n");
-        return -1;
+        return 1;
     }
 
     // TODO actually add those filters
@@ -48,7 +48,7 @@ static inline int set_seccomp_rules(void){
     // load the rules
     if(seccomp_load(ctx)){
         fprintf(stderr, LIBSANDBOX_ERR_PREFIX "could not load seccomp rules\n");
-        return -1;
+        return 1;
     }
 
     return 0;
@@ -64,30 +64,30 @@ int libsandbox_fork(char * * command_argv, void * ctx_private){
 
     if(command_argv[0] == NULL){
         fprintf(stderr, LIBSANDBOX_ERR_PREFIX "command name not specified\n");
-        return -1;
+        return 1;
     }
 
     pid_t child = fork();
 
     if(child < 0){
 
-        return -1;
+        return 1;
 
     }else if(child == 0){
 
         if(ptrace(PTRACE_TRACEME, 0, NULL, NULL)){
             fprintf(stderr, LIBSANDBOX_ERR_PREFIX "could not trace flag for child\n");
-            return -1;
+            return 1;
         }
 
         // pause execution since TRACEME won't do that by itself
         if(raise(SIGSTOP)){
             fprintf(stderr, LIBSANDBOX_ERR_PREFIX "could not pause child execution\n");
-            return -1;
+            return 1;
         }
 
         if(set_seccomp_rules()){
-            return -1;
+            return 1;
         }
 
         execvp(command_argv[0], command_argv);
@@ -95,7 +95,7 @@ int libsandbox_fork(char * * command_argv, void * ctx_private){
 
         fprintf(stderr, LIBSANDBOX_ERR_PREFIX "call to execvp failed: could not run `%s`; error=`%s`\n", command_argv[0], strerror(errno));
 
-        return -1;
+        return 1;
 
     }else{
 
@@ -106,13 +106,13 @@ int libsandbox_fork(char * * command_argv, void * ctx_private){
         if(!WIFSTOPPED(status)){ // was child stopped by a delivery of a signal
             fprintf(stderr, LIBSANDBOX_ERR_PREFIX "child was not stopped by a delivery of a signal\n");
             sigkill_or_print_err(child);
-            return -1;
+            return 1;
         }
 
         if(WSTOPSIG(status) != SIGSTOP){ // which was the signal that caused the child to stop
             fprintf(stderr, LIBSANDBOX_ERR_PREFIX "child was was stopped, but not due to SIGSTOP\n");
             sigkill_or_print_err(child);
-            return -1;
+            return 1;
         }
 
         // set some more restrictions
@@ -128,13 +128,13 @@ int libsandbox_fork(char * * command_argv, void * ctx_private){
         )){
             fprintf(stderr, LIBSANDBOX_ERR_PREFIX "could not set ptrace restrictions for child\n");
             sigkill_or_print_err(child);
-            return -1;
+            return 1;
         };
 
         if(ptrace(PTRACE_CONT, child, NULL, NULL)){
             fprintf(stderr, LIBSANDBOX_ERR_PREFIX "could not continue child execution\n");
             sigkill_or_print_err(child);
-            return -1;
+            return 1;
         }
 
     }
