@@ -7,6 +7,8 @@
 #include <signal.h> // raise
 #include <sys/wait.h> // waitpid
 #include <seccomp.h> // scmp_filter_ctx
+#include <string.h> // strerror
+ #include <errno.h> // errno
 
 #define LIBSANDBOX_ERR_PREFIX LIBSANDBOX_PRINT_PREFIX "ERROR: "
 
@@ -80,7 +82,7 @@ int libsandbox_fork(char * * command_argv, pid_t * new_process_pid){
         execvp(command_argv[0], command_argv);
         // no need to check return code, if the execution continues the call has failed for sure
 
-        fprintf(stderr, LIBSANDBOX_ERR_PREFIX "call to execvp failed: could not run `%s`\n", command_argv[0]);
+        fprintf(stderr, LIBSANDBOX_ERR_PREFIX "call to execvp failed: could not run `%s`; error=`%s`\n", command_argv[0], strerror(errno));
 
         return -1;
 

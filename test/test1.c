@@ -6,10 +6,17 @@
 
 int main(void){
 
+    // char * command_argv [] = {
+    //     "echo",
+    //     "asd 123",
+    //     "4567",
+    //     NULL,
+    // };
+
     char * command_argv [] = {
-        "echo",
-        "asd 123",
-        "4567",
+        "bash",
+        "-c",
+        "exit 69",
         NULL,
     };
 
@@ -46,7 +53,7 @@ int main(void){
 
     // execvp(command_argv[0], command_argv);
 
-    printf("process finished; return code: %d\n", ctx.return_code);
+    printf("process finished\n");
 
-    return 0;
+    return ctx.return_code;
 }
