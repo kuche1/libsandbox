@@ -199,7 +199,7 @@ int libsandbox_fork(char * * command_argv, void * ctx_private){
         execvp(command_argv[0], command_argv);
         // no need to check return code, if the execution continues the call has failed for sure
 
-        fprintf(stderr, ERR_PREFIX "call to execvp failed: could not run `%s`; error=`%s`\n", command_argv[0], strerror(errno));
+        fprintf(stderr, ERR_PREFIX "call to `execvp` failed: could not run `%s`; error=`%s`\n", command_argv[0], strerror(errno));
 
         return 1;
 
@@ -268,7 +268,7 @@ enum libsandbox_result libsandbox_next_syscall(void * ctx_private, struct libsan
     //     return 0;
     // }
     if(pid == -1){
-        fprintf(stderr, ERR_PREFIX "call to waitpid failed\n");
+        fprintf(stderr, ERR_PREFIX "call to `waitpid` failed\n");
         return LIBSANDBOX_RESULT_ERROR;
     }
 
