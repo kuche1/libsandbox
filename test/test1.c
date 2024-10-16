@@ -25,6 +25,7 @@ int main(void){
     char ctx_private[size_ctx_private];
 
     if(libsandbox_fork(command_argv, ctx_private)){
+        printf("fork failed\n");
         return 1;
     }
 
