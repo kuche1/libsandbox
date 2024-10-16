@@ -6,14 +6,11 @@
 #endif
 
 struct libsandbox_sandbox_data{
-    pid_t sandboxed_process_pid;
     int finished;
     int return_code;
-    int processes_running;
-    int processes_failed;
 };
 
-int libsandbox_fork(char * * command_argv, pid_t * new_process_pid);
+int libsandbox_fork(char * * command_argv, void * * ctx_private);
 // `command_argv` needs to be null-terminated
 
-int libsandbox_next_syscall(struct libsandbox_sandbox_data * ctx);
+int libsandbox_next_syscall(struct libsandbox_sandbox_data * ctx, void * ctx_private);

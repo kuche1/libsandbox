@@ -6,22 +6,22 @@
 
 int main(void){
 
-    // char * command_argv [] = {
-    //     "echo",
-    //     "asd 123",
-    //     "4567",
-    //     NULL,
-    // };
-
     char * command_argv [] = {
-        "bash",
-        "-c",
-        "exit 69",
+        "echo",
+        "asd 123",
+        "4567",
         NULL,
     };
 
-    pid_t pid;
-    if(libsandbox_fork(command_argv, & pid)){
+    // char * command_argv [] = {
+    //     "bash",
+    //     "-c",
+    //     "exit 69",
+    //     NULL,
+    // };
+
+    void * ctx_private = NULL;
+    if(libsandbox_fork(command_argv, & ctx_private)){
         return 1;
     }
 
@@ -30,15 +30,12 @@ int main(void){
     // TODO this should be returned by libsandbox_fork
     // also it would be best if we made 2 structs, 1 for internal things, and 1 for external
     struct libsandbox_sandbox_data ctx = {
-        .sandboxed_process_pid = pid,
         .finished = 0,
         .return_code = 0,
-        .processes_running = 1,
-        .processes_failed = 0,
     };
 
     for(;;){
-        int fail = libsandbox_next_syscall(& ctx);
+        int fail = libsandbox_next_syscall(& ctx, ctx_private);
         if(fail){
             printf("something went wrong\n");
             return 1;

@@ -8,9 +8,16 @@
 #include <sys/wait.h> // waitpid
 #include <seccomp.h> // scmp_filter_ctx
 #include <string.h> // strerror
- #include <errno.h> // errno
+#include <errno.h> // errno
+#include <stdlib.h> // malloc
 
 #define LIBSANDBOX_ERR_PREFIX LIBSANDBOX_PRINT_PREFIX "ERROR: "
+
+struct ctx_private{
+    pid_t sandboxed_process_pid; // TODO rename to `main_sandboxed` or something like that
+    int processes_running;
+    int processes_failed;
+};
 
 static inline void sigkill_or_print_err(pid_t pid){
     if(kill(pid, SIGKILL)){
@@ -49,7 +56,7 @@ static inline int set_seccomp_rules(void){
 
 }
 
-int libsandbox_fork(char * * command_argv, pid_t * new_process_pid){
+int libsandbox_fork(char * * command_argv, void * * ctx_private){
 
     if(command_argv[0] == NULL){
         fprintf(stderr, LIBSANDBOX_ERR_PREFIX "command name not specified\n");
@@ -128,13 +135,31 @@ int libsandbox_fork(char * * command_argv, pid_t * new_process_pid){
 
     }
 
-    * new_process_pid = child;
+    struct ctx_private * ctx_priv;
+
+    // TODO
+    // would be cool if we got rid of the malloc requirement
+    // make something like `libsandbox_get_ctx_priv_size` and it would just return
+    // `sizeof(struct ctx_priv)`
+    ctx_priv = malloc(sizeof(* ctx_priv));
+    if(!ctx_priv){
+        fprintf(stderr, LIBSANDBOX_ERR_PREFIX "could not allocate enough memory for private context\n");
+        sigkill_or_print_err(child);
+        return -1;
+    }
+
+    ctx_priv->sandboxed_process_pid = child;
+    ctx_priv->processes_running = 1;
+    ctx_priv->processes_failed = 0;
+
+    * ctx_private = ctx_priv;
 
     return 0;
 
 }
 
-int libsandbox_next_syscall(struct libsandbox_sandbox_data * ctx){
+int libsandbox_next_syscall(struct libsandbox_sandbox_data * ctx, void * ctx_private){
+    struct ctx_private * ctx_priv = ctx_private;
 
     int status;
     pid_t pid = waitpid(-1, &status, 0);
@@ -159,7 +184,7 @@ int libsandbox_next_syscall(struct libsandbox_sandbox_data * ctx){
     ){
 
         // new process was created
-        ctx->processes_running += 1;
+        ctx_priv->processes_running += 1;
         if(ptrace(PTRACE_CONT, pid, NULL, NULL)){
             fprintf(stderr, LIBSANDBOX_ERR_PREFIX "could not PTRACE_CONT\n");
             return 1;
@@ -172,7 +197,7 @@ int libsandbox_next_syscall(struct libsandbox_sandbox_data * ctx){
 
         // process died
 
-        ctx->processes_running -= 1;
+        ctx_priv->processes_running -= 1;
 
         unsigned long event_message;
         if(ptrace(PTRACE_GETEVENTMSG, pid, NULL, &event_message)){
@@ -185,10 +210,10 @@ int libsandbox_next_syscall(struct libsandbox_sandbox_data * ctx){
         if(code){
             // note that it might be the case that the return code signifies something else
             // rather than success/failure
-            ctx->processes_failed += 1;
+            ctx_priv->processes_failed += 1;
         }
 
-        if(pid == ctx->sandboxed_process_pid){
+        if(pid == ctx_priv->sandboxed_process_pid){
             ctx->return_code = code;
         }
 
@@ -197,7 +222,7 @@ int libsandbox_next_syscall(struct libsandbox_sandbox_data * ctx){
             return 1;
         }
 
-        if(ctx->processes_running <= 0){
+        if(ctx_priv->processes_running <= 0){
             ctx->finished = 1;
         }
 
