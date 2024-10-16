@@ -7,12 +7,12 @@
 
 int main(void){
 
-    char * command_argv [] = {
-        "echo",
-        "asd 123",
-        "4567",
-        NULL,
-    };
+    // char * command_argv [] = {
+    //     "echo",
+    //     "asd 123",
+    //     "4567",
+    //     NULL,
+    // };
 
     // char * command_argv [] = {
     //     "bash",
@@ -20,6 +20,13 @@ int main(void){
     //     "exit 69",
     //     NULL,
     // };
+
+    char * command_argv [] = {
+        "bash",
+        "-c",
+        "echo 1 & echo 2 & exit 69",
+        NULL,
+    };
 
     size_t size_ctx_private = libsandbox_get_ctx_private_size();
     char ctx_private[size_ctx_private];
