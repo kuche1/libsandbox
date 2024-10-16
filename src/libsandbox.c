@@ -40,7 +40,6 @@ struct ctx_private{
     pid_t root_process_pid;
     int processes_running;
     int processes_failed;
-    int syscalls_blocked; // TODO I can't really think of a good reason for this thing's existance
 
     pid_t evaluated_subprocess_pid;
     long evaluated_syscall_id;
@@ -285,7 +284,6 @@ int libsandbox_fork(char * * command_argv, struct libsandbox_rules * rules, void
     ctx_priv->root_process_pid = child;
     ctx_priv->processes_running = 1;
     ctx_priv->processes_failed = 0;
-    ctx_priv->syscalls_blocked = 0;
 
     return 0;
 
@@ -304,8 +302,6 @@ int libsandbox_syscall_allow(void * ctx_private){
 
 int libsandbox_syscall_deny(void * ctx_private){
     struct ctx_private * ctx_priv = ctx_private;
-
-    ctx_priv->syscalls_blocked += 1;
 
     const char * name = get_syscall_name(ctx_priv->evaluated_syscall_id);
     printf(PRINT_PREFIX "blocked syscall with id `%ld` (%s)\n", ctx_priv->evaluated_syscall_id, name);
