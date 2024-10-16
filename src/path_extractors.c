@@ -1,6 +1,9 @@
 
 // TODO ideally we would only dereference a symlink if the given syscall does so as well
 
+// `pathraw` means a path as it is (it might be a symlink)
+// `pathlink` means a dereferenced path (it's not a symlink (TODO but what about invalid symlinks, we need to test this))
+
 //////////
 ////////// low level
 //////////
@@ -48,7 +51,8 @@ static int extract_pathraw_addr(pid_t pid, char * addr, char * path, size_t path
 
 }
 
-static int extract_pathlink(char * path_raw, char * path, size_t path_size){
+// `path_actually_written_bytes` does not include the ending \0
+static int extract_pathlink(char * path_raw, char * path, size_t path_size, size_t * path_actually_written_bytes){
 
     if(path_size <= 0){
         fprintf(stderr, ERR_PREFIX "provided buffer size is <= 0\n");
@@ -73,11 +77,14 @@ static int extract_pathlink(char * path_raw, char * path, size_t path_size){
 
     path[path_dereferenced_len] = 0;
 
+    * path_actually_written_bytes = path_dereferenced_len;
+
     return 0;
 
 }
 
-static int extract_pathlink_pidmemstr(pid_t pid, char * pidmem_str, char * path, size_t path_size){
+// `path_actually_written_bytes` does not include the ending \0
+static int extract_pathlink_pidmemstr(pid_t pid, char * pidmem_str, char * path, size_t path_size, size_t * path_actually_written_bytes){
 
     char path_raw[path_size];
 
@@ -85,11 +92,13 @@ static int extract_pathlink_pidmemstr(pid_t pid, char * pidmem_str, char * path,
         return 1;
     }
 
-    return extract_pathlink(path_raw, path, path_size);
+    return extract_pathlink(path_raw, path, path_size, path_actually_written_bytes);
 
 }
 
-static int extract_pathlink_pidmemdirfd(pid_t pid, int pidmem_dirfd, char * path, size_t path_size){
+// `path_actually_written_bytes` does not include the ending \0
+// TODO for this and all similar functions: instead of adding an additional argument, the bytes read could simply be returned
+static int extract_pathlink_pidmemdirfd(pid_t pid, int pidmem_dirfd, char * path, size_t path_size, size_t * path_actually_written_bytes){
 
     char file_containing_dirfd[100];
 
@@ -113,7 +122,7 @@ static int extract_pathlink_pidmemdirfd(pid_t pid, int pidmem_dirfd, char * path
 
     if(pidmem_dirfd == AT_FDCWD){
 
-        return extract_pathlink(file_containing_dirfd, path, path_size);
+        return extract_pathlink(file_containing_dirfd, path, path_size, path_actually_written_bytes);
 
     }else{
 
@@ -150,7 +159,7 @@ static int extract_pathlink_pidmemdirfd(pid_t pid, int pidmem_dirfd, char * path
         }
 
         if((size_t) actual_path_size > path_size - 1){
-            fprintf(stderr, ERR_PREFIX "not enough memory for the actual path (a)\n");
+            fprintf(stderr, ERR_PREFIX "not enough memory for the actual path\n");
             fclose(f);
             return 1;
         }
@@ -158,7 +167,7 @@ static int extract_pathlink_pidmemdirfd(pid_t pid, int pidmem_dirfd, char * path
         size_t read = fread(path, 1, path_size - 1, f);
 
         if(read != (size_t) actual_path_size){
-            fprintf(stderr, ERR_PREFIX "not enough memory for the actual path (b) [DBG: %lu != %lu]\n", read, actual_path_size);
+            fprintf(stderr, ERR_PREFIX "`fread` failure\n");
             fclose(f);
             return 1;
         }
@@ -166,6 +175,8 @@ static int extract_pathlink_pidmemdirfd(pid_t pid, int pidmem_dirfd, char * path
         fclose(f);
 
         path[read] = 0;
+
+        * path_actually_written_bytes = read;
 
         return 0;
 
@@ -179,25 +190,53 @@ static int extract_pathlink_pidmemdirfd(pid_t pid, int pidmem_dirfd, char * path
 
 static int extract_arg0pathlink(pid_t pid, struct user_regs_struct * cpu_regs, char * path, size_t path_size){
     char * pidmem_str = (char *) CPU_REG_R_SYSCALL_ARG0(* cpu_regs);
-    return extract_pathlink_pidmemstr(pid, pidmem_str, path, path_size);
+    size_t tmp;
+    return extract_pathlink_pidmemstr(pid, pidmem_str, path, path_size, & tmp);
 }
 
 static int extract_arg0dirfd_arg1pathlink(pid_t pid, struct user_regs_struct * cpu_regs, char * path, size_t path_size){
 
-    int pidmem_dirfd = CPU_REG_R_SYSCALL_ARG0(* cpu_regs);
+    // extract file
 
-    if(extract_pathlink_pidmemdirfd(pid, pidmem_dirfd, path, path_size)){
+    char * pidmem_str = (char *) CPU_REG_R_SYSCALL_ARG1(* cpu_regs);
+
+    char filename[path_size];
+
+    if(extract_pathraw_addr(pid, pidmem_str, filename, sizeof(filename))){
+        fprintf(stderr, ERR_PREFIX "not enough memory in buffer\n");
         return 1;
     }
 
-    // TODO glue to the path now
-    // keep in mind that it might be a full path
+    if(filename[0] == '/'){
+        // it's a full path
+        strcpy(path, filename);
+        return 0;
+    }
 
-    // char * pidmem_str = (char *) CPU_REG_R_SYSCALL_ARG1(* cpu_regs);
+    // extract folder
 
-    // if(extract_pathraw_addr(pid, pidmem_str, path, path_size)){
-    //     return 1;
-    // }
+    int pidmem_dirfd = CPU_REG_R_SYSCALL_ARG0(* cpu_regs);
+
+    size_t len;
+
+    if(extract_pathlink_pidmemdirfd(pid, pidmem_dirfd, path, path_size, & len)){
+        return 1;
+    }
+
+    // add separator
+
+    path[len] = '/';
+    len += 1;
+
+    if(len >= path_size){
+        fprintf(stderr, ERR_PREFIX "not enough memory in buffer\n");
+        return 1;
+    }
+
+    // add file
+
+    // TODO this is fucking unsafe
+    strcpy(path + len, filename);
 
     return 0;
 }
