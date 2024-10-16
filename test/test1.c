@@ -21,10 +21,17 @@ int main(void){
     //     NULL,
     // };
 
+    // char * command_argv [] = {
+    //     "bash",
+    //     "-c",
+    //     "echo 1 & echo 2 & exit 69",
+    //     NULL,
+    // };
+
     char * command_argv [] = {
         "bash",
         "-c",
-        "echo 1 & echo 2 & exit 69",
+        "cat test.sh",
         NULL,
     };
 

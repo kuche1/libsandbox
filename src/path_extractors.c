@@ -42,17 +42,44 @@ static int extract_pathraw_addr(pid_t pid, char * addr, char * path, size_t path
 
 }
 
-static int extract_arg0pathlink(pid_t pid, struct user_regs_struct * cpu_regs, char * path, size_t path_size){
+static int extract_pathraw_pidmemstr(pid_t pid, char * pidmem_str, char * path, size_t path_size){
 
-    char * path_cstr = (char *) CPU_REG_R_SYSCALL_ARG0(* cpu_regs);
+    char path_raw[path_size];
 
-    if(extract_pathraw_addr(pid, path_cstr, path, path_size)){
+    if(extract_pathraw_addr(pid, pidmem_str, path_raw, sizeof(path_raw))){
         return 1;
     }
 
-    // TODO follow the path symlink
+    if(path_size <= 0){
+        fprintf(stderr, ERR_PREFIX "provided buffer size is <= 0\n");
+        return 1;
+    }
+
+    ssize_t path_dereferenced_len_or_err = readlink(path_raw, path, path_size - 1);
+
+    if(path_dereferenced_len_or_err < 0){
+        fprintf(stderr, ERR_PREFIX "could not dereference path `%s`\n", path_raw);
+        return 1;
+    }
+
+    size_t path_dereferenced_len = path_dereferenced_len_or_err;
+
+    if(path_dereferenced_len == path_size - 1){
+        // it might be the case that we have just enough memory, but we can't differentiate
+        // wetween having just enough memory and not having enough, so we'll assume the worst
+        fprintf(stderr, ERR_PREFIX "not enough memory to dereference path `%s`\n", path_raw);
+        return 1;
+    }
+
+    path[path_dereferenced_len] = 0;
 
     return 0;
+
+}
+
+static int extract_arg0pathlink(pid_t pid, struct user_regs_struct * cpu_regs, char * path, size_t path_size){
+    char * pidmem_str = (char *) CPU_REG_R_SYSCALL_ARG0(* cpu_regs);
+    return extract_pathraw_pidmemstr(pid, pidmem_str, path, path_size);
 }
 
 static int extract_arg0dirfd_arg1pathlink(pid_t pid, struct user_regs_struct * cpu_regs, char * path, size_t path_size){

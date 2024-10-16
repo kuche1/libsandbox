@@ -415,7 +415,7 @@ enum libsandbox_result libsandbox_next_syscall(void * ctx_private, struct libsan
                 continue;
             }
 
-            // TODO wtf is this
+            // TODO wtf is this, why is it needed
             if(WSTOPSIG(status) == SIGTRAP){
                 if(ptrace(PTRACE_CONT, pid, NULL, NULL)){
                     fprintf(stderr, ERR_PREFIX "could not PTRACE_CONT\n");
