@@ -147,7 +147,7 @@ int libsandbox_fork(char * * command_argv, void * ctx_private){
 
 }
 
-int libsandbox_next_syscall(struct libsandbox_sandbox_data * ctx, void * ctx_private){
+enum libsandbox_result libsandbox_next_syscall(void * ctx_private, struct libsandbox_summary * summary){
     struct ctx_private * ctx_priv = ctx_private;
 
     int status;
@@ -163,7 +163,7 @@ int libsandbox_next_syscall(struct libsandbox_sandbox_data * ctx, void * ctx_pri
     // }
     if(pid == -1){
         fprintf(stderr, LIBSANDBOX_ERR_PREFIX "call to waitpid failed\n");
-        return 1;
+        return LIBSANDBOX_RESULT_ERROR;
     }
 
     if(
@@ -176,9 +176,9 @@ int libsandbox_next_syscall(struct libsandbox_sandbox_data * ctx, void * ctx_pri
         ctx_priv->processes_running += 1;
         if(ptrace(PTRACE_CONT, pid, NULL, NULL)){
             fprintf(stderr, LIBSANDBOX_ERR_PREFIX "could not PTRACE_CONT\n");
-            return 1;
+            return LIBSANDBOX_RESULT_ERROR;
         }
-        return 0;
+        return LIBSANDBOX_RESULT_CONTINUE;
 
     }else if(
         status>>8 == (SIGTRAP | (PTRACE_EVENT_EXIT<<8))
@@ -191,7 +191,7 @@ int libsandbox_next_syscall(struct libsandbox_sandbox_data * ctx, void * ctx_pri
         unsigned long event_message;
         if(ptrace(PTRACE_GETEVENTMSG, pid, NULL, &event_message)){
             fprintf(stderr, LIBSANDBOX_ERR_PREFIX "could not PTRACE_GETEVENTMSG\n");
-            return 1;
+            return LIBSANDBOX_RESULT_ERROR;
         }
 
         int code = event_message >> 8;
@@ -203,19 +203,19 @@ int libsandbox_next_syscall(struct libsandbox_sandbox_data * ctx, void * ctx_pri
         }
 
         if(pid == ctx_priv->root_process_pid){
-            ctx->return_code = code;
+            summary->return_code = code;
         }
 
         if(ptrace(PTRACE_CONT, pid, NULL, NULL)){
             fprintf(stderr, LIBSANDBOX_ERR_PREFIX "could not PTRACE_CONT\n");
-            return 1;
+            return LIBSANDBOX_RESULT_ERROR;
         }
 
         if(ctx_priv->processes_running <= 0){
-            ctx->finished = 1;
+            return LIBSANDBOX_RESULT_FINISHED;
         }
 
-        return 0;
+        return LIBSANDBOX_RESULT_CONTINUE;
 
     }else if(
         status>>8 == (SIGTRAP | (PTRACE_EVENT_SECCOMP<<8))
@@ -228,25 +228,25 @@ int libsandbox_next_syscall(struct libsandbox_sandbox_data * ctx, void * ctx_pri
         if(!WIFSTOPPED(status)){
             // WIFSTOPPED(status): returns true if the child process was stopped by delivery of a signal; this is only possible if the call was done using WUNTRACED or when the child is being traced
             // so, this was NOT caused by us, and using PTRACE_CONT will do nothing and fail
-            return 0;
+            return LIBSANDBOX_RESULT_CONTINUE;
         }
 
         // TODO wtf is this
         if(WSTOPSIG(status) == SIGTRAP){
             if(ptrace(PTRACE_CONT, pid, NULL, NULL)){
                 fprintf(stderr, LIBSANDBOX_ERR_PREFIX "could not PTRACE_CONT\n");
-                return 1;
+                return LIBSANDBOX_RESULT_ERROR;
             }
-            return 0;
+            return LIBSANDBOX_RESULT_CONTINUE;
         }
 
         // forward the signal to the child
         if(ptrace(PTRACE_CONT, pid, NULL, WSTOPSIG(status))){
             fprintf(stderr, LIBSANDBOX_ERR_PREFIX "could not PTRACE_CONT\n");
-            return 1;
+            return LIBSANDBOX_RESULT_ERROR;
         }
 
-        return 0;
+        return LIBSANDBOX_RESULT_CONTINUE;
 
     }
 
@@ -254,9 +254,9 @@ int libsandbox_next_syscall(struct libsandbox_sandbox_data * ctx, void * ctx_pri
     // currently we're allowing everything
     if(ptrace(PTRACE_CONT, pid, NULL, NULL)){
         fprintf(stderr, LIBSANDBOX_ERR_PREFIX "could not PTRACE_CONT\n");
-        return 1;
+        return LIBSANDBOX_RESULT_ERROR;
     }
 
-    return 0;
+    return LIBSANDBOX_RESULT_CONTINUE;
 
 }

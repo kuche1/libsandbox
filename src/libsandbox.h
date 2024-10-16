@@ -5,8 +5,13 @@
 #define LIBSANDBOX_PRINT_PREFIX "libsandbox: "
 #endif
 
-struct libsandbox_sandbox_data{
-    int finished;
+enum libsandbox_result{
+    LIBSANDBOX_RESULT_CONTINUE = 0,
+    LIBSANDBOX_RESULT_FINISHED,
+    LIBSANDBOX_RESULT_ERROR,
+};
+
+struct libsandbox_summary{
     int return_code;
 };
 
@@ -16,4 +21,4 @@ int libsandbox_fork(char * * command_argv, void * ctx_private);
 // `command_argv` needs to be null-terminated
 // `ctx_private` needs to be a pointer to memory of length `libsandbox_get_ctx_private_size()`
 
-int libsandbox_next_syscall(struct libsandbox_sandbox_data * ctx, void * ctx_private);
+enum libsandbox_result libsandbox_next_syscall(void * ctx_private, struct libsandbox_summary * summary);

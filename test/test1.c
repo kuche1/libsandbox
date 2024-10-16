@@ -7,19 +7,19 @@
 
 int main(void){
 
-    // char * command_argv [] = {
-    //     "echo",
-    //     "asd 123",
-    //     "4567",
-    //     NULL,
-    // };
-
     char * command_argv [] = {
-        "bash",
-        "-c",
-        "exit 69",
+        "echo",
+        "asd 123",
+        "4567",
         NULL,
     };
+
+    // char * command_argv [] = {
+    //     "bash",
+    //     "-c",
+    //     "exit 69",
+    //     NULL,
+    // };
 
     size_t size_ctx_private = libsandbox_get_ctx_private_size();
     char ctx_private[size_ctx_private];
@@ -30,23 +30,27 @@ int main(void){
 
     printf("forked successfully\n");
 
-    // TODO this should be returned by libsandbox_fork
-    // also it would be best if we made 2 structs, 1 for internal things, and 1 for external
-    struct libsandbox_sandbox_data ctx = {
-        .finished = 0,
-        .return_code = 0,
-    };
+    struct libsandbox_summary summary;
 
-    for(;;){
-        int fail = libsandbox_next_syscall(& ctx, ctx_private);
-        if(fail){
-            printf("something went wrong\n");
-            return 1;
+    for(int running = 1; running;){
+
+        switch(libsandbox_next_syscall(ctx_private, & summary)){
+
+            case LIBSANDBOX_RESULT_CONTINUE:{
+                // pass
+            }break;
+
+            case LIBSANDBOX_RESULT_FINISHED:{
+                running = 0;
+            }break;
+
+            case LIBSANDBOX_RESULT_ERROR:{
+                printf("something went wrong\n");
+                return 1;
+            }break;
+
         }
 
-        if(ctx.finished){
-            break;
-        }
     }
 
     // sleep(3);
@@ -55,5 +59,5 @@ int main(void){
 
     printf("process finished\n");
 
-    return ctx.return_code;
+    return summary.return_code;
 }
