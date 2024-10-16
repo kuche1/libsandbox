@@ -86,20 +86,25 @@ static int extract_pathlink(char * path_raw, char * path, size_t path_size, size
 
 }
 
-// `path_actually_written_bytes` does not include the ending \0
-static int extract_pathlink_pidmemstr(pid_t pid, char * pidmem_str, char * path, size_t path_size, size_t * path_actually_written_bytes){
+// returns (negative on error) or (number of bytes written, excluding ending \0)
+static int extract_pathlink_pidmemstr(pid_t pid, char * pidmem_str, char * path, size_t path_size){
 
     char path_raw[path_size];
 
     if(extract_pathraw_addr(pid, pidmem_str, path_raw, sizeof(path_raw)) < 0){
-        return 1;
+        return -1;
     }
 
-    return extract_pathlink(path_raw, path, path_size, path_actually_written_bytes);
+    size_t path_actually_written_bytes;
+    if(extract_pathlink(path_raw, path, path_size, & path_actually_written_bytes)){
+        return -1;
+    }
+
+    return path_actually_written_bytes;
 
 }
 
-// `path_actually_written_bytes` does not include the ending \0
+// returns (negative on error) or (number of bytes written, excluding ending \0)
 static ssize_t extract_pathlink_pidmemdirfd(pid_t pid, int pidmem_dirfd, char * path, size_t path_size){
 
     char file_containing_dirfd[100];
@@ -194,8 +199,10 @@ static ssize_t extract_pathlink_pidmemdirfd(pid_t pid, int pidmem_dirfd, char * 
 
 static int extract_arg0pathlink(pid_t pid, struct user_regs_struct * cpu_regs, char * path, size_t path_size){
     char * pidmem_str = (char *) CPU_REG_R_SYSCALL_ARG0(* cpu_regs);
-    size_t tmp;
-    return extract_pathlink_pidmemstr(pid, pidmem_str, path, path_size, & tmp);
+    if(extract_pathlink_pidmemstr(pid, pidmem_str, path, path_size) < 0){
+        return 1;
+    }
+    return 0;
 }
 
 static int extract_arg0dirfd_arg1pathlink(pid_t pid, struct user_regs_struct * cpu_regs, char * path, size_t path_size){
