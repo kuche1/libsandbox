@@ -17,4 +17,3 @@ int libsandbox_fork(char * * command_argv, pid_t * new_process_pid);
 // `command_argv` needs to be null-terminated
 
 int libsandbox_next_syscall(struct libsandbox_sandbox_data * ctx);
-// TODO there really should be a struct
