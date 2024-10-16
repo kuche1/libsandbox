@@ -1,4 +1,6 @@
 
+// TODO ideally we would only dereference a symlink if the given syscall does so as well
+
 static int extract_pathraw_addr(pid_t pid, char * addr, char * path, size_t path_size){
 
     for(;;){
