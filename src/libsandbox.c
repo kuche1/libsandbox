@@ -13,7 +13,7 @@
 #define LIBSANDBOX_ERR_PREFIX LIBSANDBOX_PRINT_PREFIX "ERROR: "
 
 struct ctx_private{
-    pid_t sandboxed_process_pid; // TODO rename to `main_sandboxed` or something like that
+    pid_t root_process_pid;
     int processes_running;
     int processes_failed;
 };
@@ -139,7 +139,7 @@ int libsandbox_fork(char * * command_argv, void * ctx_private){
 
     }
 
-    ctx_priv->sandboxed_process_pid = child;
+    ctx_priv->root_process_pid = child;
     ctx_priv->processes_running = 1;
     ctx_priv->processes_failed = 0;
 
@@ -202,7 +202,7 @@ int libsandbox_next_syscall(struct libsandbox_sandbox_data * ctx, void * ctx_pri
             ctx_priv->processes_failed += 1;
         }
 
-        if(pid == ctx_priv->sandboxed_process_pid){
+        if(pid == ctx_priv->root_process_pid){
             ctx->return_code = code;
         }
 
