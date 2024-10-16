@@ -235,6 +235,7 @@ int libsandbox_next_syscall(pid_t sandboxed_process_pid, int * finished, int * r
     }
 
     // TODO the code for the filtering should go here
+    // currently we're allowing everything
     if(ptrace(PTRACE_CONT, pid, NULL, NULL)){
         fprintf(stderr, LIBSANDBOX_ERR_PREFIX "could not PTRACE_CONT\n");
         return 1;
