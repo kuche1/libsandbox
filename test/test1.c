@@ -38,7 +38,7 @@ int main(void){
     char * command_argv [] = {
         "bash",
         "-c",
-        "ln -s a b",
+        "ln -s a b", // also tried with /a or /b
         NULL,
     };
 
