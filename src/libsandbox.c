@@ -1,8 +1,6 @@
 
 #include "libsandbox.h"
 
-#include "get_syscall_name.c"
-
 #include <unistd.h> // fork
 #include <sys/ptrace.h> // ptrace
 #include <stdio.h> // fprintf
@@ -13,6 +11,9 @@
 #include <errno.h> // errno
 #include <sys/user.h> // user_regs_struct
 #include <sys/syscall.h> // SYS_*
+
+#include "get_syscall_name.c"
+// depends on the existing namespace for the SYS_* defines
 
 #define PRINT_PREFIX LIBSANDBOX_PRINT_PREFIX
 #define ERR_PREFIX PRINT_PREFIX "ERROR: "

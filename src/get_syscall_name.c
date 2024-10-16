@@ -1,7 +1,7 @@
 
 // taken from: https://gist.github.com/willb/14488/80deaf4363ed408a562c53ab0e56d8833a34a8aa
 
-#include <sys/syscall.h> // SYS_*
+// depends on the existing namespace for the SYS_* defines
 
 static const char * get_syscall_name(long syscall_id){
 
