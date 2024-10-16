@@ -40,7 +40,7 @@ struct ctx_private{
     pid_t root_process_pid;
     int processes_running;
     int processes_failed;
-    int syscalls_blocked;
+    int syscalls_blocked; // TODO I can't really think of a good reason for this thing's existance
 
     pid_t evaluated_subprocess_pid;
     long evaluated_syscall_id;
@@ -328,154 +328,159 @@ int libsandbox_syscall_deny(void * ctx_private){
 enum libsandbox_result libsandbox_next_syscall(void * ctx_private, struct libsandbox_summary * summary, char * access_attempt_path, size_t access_attempt_path_size){
     struct ctx_private * ctx_priv = ctx_private;
 
-    int status;
-    pid_t pid = waitpid(-1, & status, 0);
-    // the first argument being -1 means: wait for any child process
-    // `waitpid` returns when a child's state changes, and that means: the child terminated, the child was stopped by a signal, or the child was resumed by a signal
+    for(;;){
 
-    // if(pid == -1){
-    //     // we're never supposed to reach this
-    //     fprintf(stderr, ERR_PREFIX "WTF something is wrong\n");
-    //     * finished = 1;
-    //     return 0;
-    // }
-    if(pid == -1){
-        fprintf(stderr, ERR_PREFIX "call to `waitpid` failed\n");
-        return LIBSANDBOX_RESULT_ERROR;
-    }
+        int status;
+        pid_t pid = waitpid(-1, & status, 0);
+        // the first argument being -1 means: wait for any child process
+        // `waitpid` returns when a child's state changes, and that means: the child terminated, the child was stopped by a signal, or the child was resumed by a signal
 
-    if(
-        ( status>>8 == (SIGTRAP | (PTRACE_EVENT_CLONE<<8)) ) ||
-        ( status>>8 == (SIGTRAP | (PTRACE_EVENT_FORK<<8))  ) ||
-        ( status>>8 == (SIGTRAP | (PTRACE_EVENT_VFORK<<8)) )
-    ){
-
-        // new process was created
-        ctx_priv->processes_running += 1;
-        if(ptrace(PTRACE_CONT, pid, NULL, NULL)){
-            fprintf(stderr, ERR_PREFIX "could not PTRACE_CONT\n");
-            return LIBSANDBOX_RESULT_ERROR;
-        }
-        return LIBSANDBOX_RESULT_CONTINUE;
-
-    }else if(
-        status>>8 == (SIGTRAP | (PTRACE_EVENT_EXIT<<8))
-    ){
-
-        // process died
-
-        ctx_priv->processes_running -= 1;
-
-        unsigned long event_message;
-        if(ptrace(PTRACE_GETEVENTMSG, pid, NULL, & event_message)){
-            fprintf(stderr, ERR_PREFIX "could not PTRACE_GETEVENTMSG\n");
+        // if(pid == -1){
+        //     // we're never supposed to reach this
+        //     fprintf(stderr, ERR_PREFIX "WTF something is wrong\n");
+        //     * finished = 1;
+        //     return 0;
+        // }
+        if(pid == -1){
+            fprintf(stderr, ERR_PREFIX "call to `waitpid` failed\n");
             return LIBSANDBOX_RESULT_ERROR;
         }
 
-        int code = event_message >> 8;
+        if(
+            ( status>>8 == (SIGTRAP | (PTRACE_EVENT_CLONE<<8)) ) ||
+            ( status>>8 == (SIGTRAP | (PTRACE_EVENT_FORK<<8))  ) ||
+            ( status>>8 == (SIGTRAP | (PTRACE_EVENT_VFORK<<8)) )
+        ){
 
-        if(code){
-            // note that it might be the case that the return code signifies something else
-            // rather than success/failure
-            ctx_priv->processes_failed += 1;
-        }
+            // new process was created
 
-        if(pid == ctx_priv->root_process_pid){
-            summary->return_code = code;
-        }
+            ctx_priv->processes_running += 1;
 
-        if(ptrace(PTRACE_CONT, pid, NULL, NULL)){
-            fprintf(stderr, ERR_PREFIX "could not PTRACE_CONT\n");
-            return LIBSANDBOX_RESULT_ERROR;
-        }
-
-        if(ctx_priv->processes_running <= 0){
-            return LIBSANDBOX_RESULT_FINISHED;
-        }
-
-        return LIBSANDBOX_RESULT_CONTINUE;
-
-    }else if(
-        status>>8 == (SIGTRAP | (PTRACE_EVENT_SECCOMP<<8))
-    ){
-
-        // generic syscall that we need to filter
-
-    }else{
-
-        if(!WIFSTOPPED(status)){
-            // WIFSTOPPED(status): returns true if the child process was stopped by delivery of a signal; this is only possible if the call was done using WUNTRACED or when the child is being traced
-            // so, this was NOT caused by us, and using PTRACE_CONT will do nothing and fail
-            return LIBSANDBOX_RESULT_CONTINUE;
-        }
-
-        // TODO wtf is this
-        if(WSTOPSIG(status) == SIGTRAP){
             if(ptrace(PTRACE_CONT, pid, NULL, NULL)){
                 fprintf(stderr, ERR_PREFIX "could not PTRACE_CONT\n");
                 return LIBSANDBOX_RESULT_ERROR;
             }
-            return LIBSANDBOX_RESULT_CONTINUE;
-        }
 
-        // forward the signal to the child
-        if(ptrace(PTRACE_CONT, pid, NULL, WSTOPSIG(status))){
-            fprintf(stderr, ERR_PREFIX "could not PTRACE_CONT\n");
-            return LIBSANDBOX_RESULT_ERROR;
-        }
+            continue;
 
-        return LIBSANDBOX_RESULT_CONTINUE;
+        }else if(
+            status>>8 == (SIGTRAP | (PTRACE_EVENT_EXIT<<8))
+        ){
 
-    }
+            // process died
 
-    // get CPU regs
-    if(ptrace(PTRACE_GETREGS, pid, NULL, & ctx_priv->evaluated_cpu_regs)){
-        fprintf(stderr, ERR_PREFIX "could not PTRACE_GETREGS\n");
-        return LIBSANDBOX_RESULT_ERROR;
-    }
+            ctx_priv->processes_running -= 1;
 
-    ctx_priv->evaluated_subprocess_pid = pid;
-    ctx_priv->evaluated_syscall_id = CPU_REG_RW_SYSCALL_ID(ctx_priv->evaluated_cpu_regs);
-
-    switch(ctx_priv->evaluated_syscall_id){
-
-            case SYS_creat:
-            case SYS_open:
-            case SYS_mknod:
-            case SYS_truncate:
-            case SYS_mkdir:
-            case SYS_rmdir:
-            case SYS_chdir:
-            case SYS_chroot:
-            case SYS_unlink:
-            case SYS_readlink:
-            case SYS_stat:
-            case SYS_lstat:
-            case SYS_chmod:
-            case SYS_unlinkat:
-            case SYS_readlinkat:
-            case SYS_chown:
-            case SYS_lchown: // does not dereference symlinks
-            case SYS_utime:
-            case SYS_utimes:
-            case SYS_access:{
-
-            if(extract_pathlink_arg0(ctx_priv->root_process_pid, & ctx_priv->evaluated_cpu_regs, access_attempt_path, access_attempt_path_size)){
+            unsigned long event_message;
+            if(ptrace(PTRACE_GETEVENTMSG, pid, NULL, & event_message)){
+                fprintf(stderr, ERR_PREFIX "could not PTRACE_GETEVENTMSG\n");
                 return LIBSANDBOX_RESULT_ERROR;
             }
 
-            return LIBSANDBOX_RESULT_ACCESS_ATTEMPT_PATH;
+            int code = event_message >> 8;
 
-        }break;
+            if(code){
+                // note that it might be the case that the return code signifies something else
+                // rather than success/failure
+                ctx_priv->processes_failed += 1;
+            }
 
-        default:{
-            const char * name = get_syscall_name(ctx_priv->evaluated_syscall_id);
-            fprintf(stderr, ERR_PREFIX "unknown syscal with id `%ld` (%s); this is a bug that needs to be reported\n", ctx_priv->evaluated_syscall_id, name);
+            if(pid == ctx_priv->root_process_pid){
+                summary->return_code = code;
+            }
+
+            if(ptrace(PTRACE_CONT, pid, NULL, NULL)){
+                fprintf(stderr, ERR_PREFIX "could not PTRACE_CONT\n");
+                return LIBSANDBOX_RESULT_ERROR;
+            }
+
+            if(ctx_priv->processes_running <= 0){
+                return LIBSANDBOX_RESULT_FINISHED;
+            }
+
+            continue;
+
+        }else if(
+            status>>8 == (SIGTRAP | (PTRACE_EVENT_SECCOMP<<8))
+        ){
+
+            // generic syscall that we need to filter
+
+        }else{
+
+            if(!WIFSTOPPED(status)){
+                // WIFSTOPPED(status): returns true if the child process was stopped by delivery of a signal; this is only possible if the call was done using WUNTRACED or when the child is being traced
+                // so, this was NOT caused by us, and using PTRACE_CONT will do nothing and fail
+                continue;
+            }
+
+            // TODO wtf is this
+            if(WSTOPSIG(status) == SIGTRAP){
+                if(ptrace(PTRACE_CONT, pid, NULL, NULL)){
+                    fprintf(stderr, ERR_PREFIX "could not PTRACE_CONT\n");
+                    return LIBSANDBOX_RESULT_ERROR;
+                }
+                continue;
+            }
+
+            // forward the signal to the child
+            if(ptrace(PTRACE_CONT, pid, NULL, WSTOPSIG(status))){
+                fprintf(stderr, ERR_PREFIX "could not PTRACE_CONT\n");
+                return LIBSANDBOX_RESULT_ERROR;
+            }
+
+            continue;
+
+        }
+
+        // get CPU regs
+        if(ptrace(PTRACE_GETREGS, pid, NULL, & ctx_priv->evaluated_cpu_regs)){
+            fprintf(stderr, ERR_PREFIX "could not PTRACE_GETREGS\n");
             return LIBSANDBOX_RESULT_ERROR;
-        }break;
+        }
+
+        ctx_priv->evaluated_subprocess_pid = pid;
+        ctx_priv->evaluated_syscall_id = CPU_REG_RW_SYSCALL_ID(ctx_priv->evaluated_cpu_regs);
+
+        switch(ctx_priv->evaluated_syscall_id){
+
+                case SYS_creat:
+                case SYS_open:
+                case SYS_mknod:
+                case SYS_truncate:
+                case SYS_mkdir:
+                case SYS_rmdir:
+                case SYS_chdir:
+                case SYS_chroot:
+                case SYS_unlink:
+                case SYS_readlink:
+                case SYS_stat:
+                case SYS_lstat:
+                case SYS_chmod:
+                case SYS_unlinkat:
+                case SYS_readlinkat:
+                case SYS_chown:
+                case SYS_lchown: // does not dereference symlinks
+                case SYS_utime:
+                case SYS_utimes:
+                case SYS_access:{
+
+                if(extract_pathlink_arg0(ctx_priv->root_process_pid, & ctx_priv->evaluated_cpu_regs, access_attempt_path, access_attempt_path_size)){
+                    return LIBSANDBOX_RESULT_ERROR;
+                }
+
+                return LIBSANDBOX_RESULT_ACCESS_ATTEMPT_PATH;
+
+            }break;
+
+            default:{
+                const char * name = get_syscall_name(ctx_priv->evaluated_syscall_id);
+                fprintf(stderr, ERR_PREFIX "unknown syscal with id `%ld` (%s); this is a bug that needs to be reported\n", ctx_priv->evaluated_syscall_id, name);
+                return LIBSANDBOX_RESULT_ERROR;
+            }break;
+
+        }
 
     }
-
-    return LIBSANDBOX_RESULT_CONTINUE;
 
 }

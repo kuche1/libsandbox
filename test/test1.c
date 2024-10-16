@@ -50,10 +50,6 @@ int main(void){
 
         switch(libsandbox_next_syscall(ctx_private, & summary, path, sizeof(path))){
 
-            case LIBSANDBOX_RESULT_CONTINUE:{
-                // pass
-            }break;
-
             case LIBSANDBOX_RESULT_FINISHED:{
                 running = 0;
             }break;

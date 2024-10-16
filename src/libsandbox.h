@@ -6,9 +6,8 @@
 #endif
 
 enum libsandbox_result{
-    LIBSANDBOX_RESULT_CONTINUE = 0, // TODO make it so that this is no longer needed
+    LIBSANDBOX_RESULT_FINISHED = 0,
     LIBSANDBOX_RESULT_ERROR,
-    LIBSANDBOX_RESULT_FINISHED,
     LIBSANDBOX_RESULT_ACCESS_ATTEMPT_PATH,
 };
 
