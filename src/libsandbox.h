@@ -15,9 +15,17 @@ struct libsandbox_summary{
     int return_code;
 };
 
+struct libsandbox_rules{
+    int filesystem_allow_all;
+    int filesystem_allow_metadata;
+    int networking_allow_all;
+};
+
+void libsandbox_rules_init(struct libsandbox_rules * rules, int permissive);
+
 size_t libsandbox_get_ctx_private_size(void);
 
-int libsandbox_fork(char * * command_argv, void * ctx_private);
+int libsandbox_fork(char * * command_argv, struct libsandbox_rules * rules, void * ctx_private);
 // `command_argv` needs to be null-terminated
 // `ctx_private` needs to be a pointer to memory of size `libsandbox_get_ctx_private_size()`
 

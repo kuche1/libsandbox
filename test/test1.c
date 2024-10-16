@@ -28,10 +28,13 @@ int main(void){
         NULL,
     };
 
+    struct libsandbox_rules rules;
+    libsandbox_rules_init(& rules, 1); // `1` stands for permissive
+
     size_t size_ctx_private = libsandbox_get_ctx_private_size();
     char ctx_private[size_ctx_private];
 
-    if(libsandbox_fork(command_argv, ctx_private)){
+    if(libsandbox_fork(command_argv, & rules, ctx_private)){
         printf("fork failed\n");
         return 1;
     }

@@ -32,7 +32,7 @@ static inline void sigkill_or_print_err(pid_t pid){
     }
 }
 
-static inline int set_seccomp_rules(int filesystem_allow_all, int filesystem_allow_metadata, int networking_allow_all){
+static inline int set_seccomp_rules(struct libsandbox_rules * rules){
 
     // SCMP_ACT_ALLOW - allow the syscall
     // SCMP_ACT_LOG - allow but log
@@ -56,12 +56,12 @@ static inline int set_seccomp_rules(int filesystem_allow_all, int filesystem_all
         // https://linasm.sourceforge.net/docs/syscalls/filesystem.php
 
         uint32_t action = SCMP_ACT_TRACE(69);
-        if(filesystem_allow_all){
+        if(rules->filesystem_allow_all){
             action = SCMP_ACT_ALLOW;
         }
 
         uint32_t action_metadata = action;
-        if(filesystem_allow_metadata){
+        if(rules->filesystem_allow_metadata){
             action_metadata = SCMP_ACT_ALLOW;
         }
 
@@ -142,7 +142,7 @@ static inline int set_seccomp_rules(int filesystem_allow_all, int filesystem_all
     {
         uint32_t action = SCMP_ACT_TRACE(69);
 
-        if(networking_allow_all){
+        if(rules->networking_allow_all){
             action = SCMP_ACT_ALLOW;
         }
 
@@ -160,11 +160,17 @@ static inline int set_seccomp_rules(int filesystem_allow_all, int filesystem_all
 
 }
 
+void libsandbox_rules_init(struct libsandbox_rules * rules, int permissive){
+    rules->filesystem_allow_all = permissive;
+    rules->filesystem_allow_metadata = permissive;
+    rules->networking_allow_all = permissive;
+}
+
 size_t libsandbox_get_ctx_private_size(void){
     return sizeof(struct ctx_private);
 }
 
-int libsandbox_fork(char * * command_argv, void * ctx_private){
+int libsandbox_fork(char * * command_argv, struct libsandbox_rules * rules, void * ctx_private){
     struct ctx_private * ctx_priv = ctx_private;
 
     if(command_argv[0] == NULL){
@@ -191,8 +197,7 @@ int libsandbox_fork(char * * command_argv, void * ctx_private){
             return 1;
         }
 
-        // TODO those args are too permissive
-        if(set_seccomp_rules(1, 1, 1)){
+        if(set_seccomp_rules(rules)){
             return 1;
         }
 
