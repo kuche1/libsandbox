@@ -8,7 +8,10 @@
 ////////// low level
 //////////
 
-static int extract_pathraw_addr(pid_t pid, char * addr, char * path, size_t path_size){
+// returns how much bytes have been written (excluding the last \0), or negative if error
+static ssize_t extract_pathraw_addr(pid_t pid, char * addr, char * path, size_t path_size){
+
+    ssize_t bytes_read = 0;
 
     for(;;){
 
@@ -22,7 +25,7 @@ static int extract_pathraw_addr(pid_t pid, char * addr, char * path, size_t path
         if( (*(long*)chunk == -1) && (errno != 0) ){
             // the process has probably exited (or perhaps the address is wrong) (or perhaps there is a bug in the program that makes it try and read an invalid address)
             fprintf(stderr, ERR_PREFIX "could not read from address space of process with pid `%d`\n", pid);
-            return 1;
+            return -1;
         }
 
         addr += sizeof(long);
@@ -34,16 +37,16 @@ static int extract_pathraw_addr(pid_t pid, char * addr, char * path, size_t path
 
             if(path_size <= 0){
                 fprintf(stderr, ERR_PREFIX "not enough memory in buffer to extract rawpath of process with pid `%d`\n", pid);
-                return 1;
+                return -1;
             }
 
-            path[0] = ch;
+            path[bytes_read] = ch;
 
             if(ch == 0){
-                return 0;
+                return bytes_read;
             }
 
-            path += 1;
+            bytes_read += 1;
             path_size -= 1;
         }
 
@@ -88,7 +91,7 @@ static int extract_pathlink_pidmemstr(pid_t pid, char * pidmem_str, char * path,
 
     char path_raw[path_size];
 
-    if(extract_pathraw_addr(pid, pidmem_str, path_raw, sizeof(path_raw))){
+    if(extract_pathraw_addr(pid, pidmem_str, path_raw, sizeof(path_raw)) < 0){
         return 1;
     }
 
@@ -202,7 +205,9 @@ static int extract_arg0dirfd_arg1pathlink(pid_t pid, struct user_regs_struct * c
 
     char filename[path_size];
 
-    if(extract_pathraw_addr(pid, pidmem_str, filename, sizeof(filename))){
+    ssize_t filename_len = extract_pathraw_addr(pid, pidmem_str, filename, sizeof(filename));
+
+    if(filename_len < 0){
         fprintf(stderr, ERR_PREFIX "not enough memory in buffer\n");
         return 1;
     }
@@ -217,26 +222,30 @@ static int extract_arg0dirfd_arg1pathlink(pid_t pid, struct user_regs_struct * c
 
     int pidmem_dirfd = CPU_REG_R_SYSCALL_ARG0(* cpu_regs);
 
-    size_t len;
+    size_t path_len;
 
-    if(extract_pathlink_pidmemdirfd(pid, pidmem_dirfd, path, path_size, & len)){
+    if(extract_pathlink_pidmemdirfd(pid, pidmem_dirfd, path, path_size, & path_len)){
         return 1;
     }
 
     // add separator
 
-    path[len] = '/';
-    len += 1;
+    path[path_len] = '/';
+    path_len += 1;
 
-    if(len >= path_size){
+    if(path_len >= path_size){
         fprintf(stderr, ERR_PREFIX "not enough memory in buffer\n");
         return 1;
     }
 
     // add file
 
-    // TODO this is fucking unsafe
-    strcpy(path + len, filename);
+    if(path_len + filename_len >= path_size){
+        fprintf(stderr, ERR_PREFIX "not enough memory in buffer\n");
+        return 1;
+    }
+
+    strcpy(path + path_len, filename);
 
     return 0;
 }
