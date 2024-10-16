@@ -132,15 +132,22 @@ static int extract_pathlink(pid_t pid, char * path_raw, char * path, size_t path
         if(path_dereferenced_len_or_err_errno == ENOENT){
             // we're trying to dereference a non-existant file/folder, no wonder it's failing
 
-            int path_len = extract_cwd(pid, path_size, path);
+            ssize_t path_len_or_err = extract_cwd(pid, path_size, path);
 
-            if(path_len < 0){
+            if(path_len_or_err < 0){
                 return 1;
             }
 
-            * path_actually_written_bytes = path_len;
+            size_t path_len = path_len_or_err;
+
+            if(str_append_char(path, path_size, & path_len, '/')){
+                fprintf(stderr, ERR_PREFIX "buf too small\n");
+                return 1;
+            }
 
             // TODO actually fucking glue the path
+
+            * path_actually_written_bytes = path_len;
 
             return 0;
 
