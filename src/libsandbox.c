@@ -12,21 +12,18 @@
 #include <sys/user.h> // user_regs_struct
 #include <sys/syscall.h> // SYS_*
 
-#include "get_syscall_name.c"
-// depends on the existing namespace for the SYS_* defines
-
 #define PRINT_PREFIX LIBSANDBOX_PRINT_PREFIX
 #define ERR_PREFIX PRINT_PREFIX "ERROR: "
 
 // `RW` means that we can both read and write to the register
 // `R` means that the register is read-only
 #if __WORDSIZE == 64
-    #define CPU_REG_RW_SYSCALL_ID(cpu_regs) cpu_regs.orig_rax
-    #define CPU_REG_R_SYSCALL_ARG0(cpu_regs) cpu_regs.rdi
-    #define CPU_REG_R_SYSCALL_ARG1(cpu_regs) cpu_regs.rsi
-    #define CPU_REG_R_SYSCALL_ARG2(cpu_regs) cpu_regs.rdx
-    #define CPU_REG_R_SYSCALL_ARG3(cpu_regs) cpu_regs.r10
-    #define CPU_REG_RW_SYSCALL_RET(cpu_regs) cpu_regs.rax // the return code of the syscall
+    #define CPU_REG_RW_SYSCALL_ID(cpu_regs)  (cpu_regs).orig_rax
+    #define CPU_REG_R_SYSCALL_ARG0(cpu_regs) (cpu_regs).rdi
+    #define CPU_REG_R_SYSCALL_ARG1(cpu_regs) (cpu_regs).rsi
+    #define CPU_REG_R_SYSCALL_ARG2(cpu_regs) (cpu_regs).rdx
+    #define CPU_REG_R_SYSCALL_ARG3(cpu_regs) (cpu_regs).r10
+    #define CPU_REG_RW_SYSCALL_RET(cpu_regs) (cpu_regs).rax // the return code of the syscall
 #else
     #error Only 64bit is supported for now
 #endif
@@ -44,7 +41,18 @@ struct ctx_private{
     int processes_running;
     int processes_failed;
     int syscalls_blocked;
+
+    pid_t evaluated_subprocess_pid;
+    long evaluated_syscall_id;
+    struct user_regs_struct evaluated_cpu_regs;
 };
+
+//////////
+////////// functions: private
+//////////
+
+#include "get_syscall_name.c" // depends on the existing namespace for the SYS_* defines
+#include "path_extractors.c"
 
 static inline void sigkill_or_print_err(pid_t pid){
     if(kill(pid, SIGKILL)){
@@ -180,6 +188,10 @@ static inline int set_seccomp_rules(struct libsandbox_rules * rules){
 
 }
 
+//////////
+////////// functions: public
+//////////
+
 void libsandbox_rules_init(struct libsandbox_rules * rules, int permissive){
     rules->filesystem_allow_all = permissive;
     rules->filesystem_allow_metadata = permissive;
@@ -232,7 +244,7 @@ int libsandbox_fork(char * * command_argv, struct libsandbox_rules * rules, void
 
         // wait for the SIGSTOP
         int status;
-        waitpid(child, &status, 0);
+        waitpid(child, & status, 0);
 
         if(!WIFSTOPPED(status)){ // was child stopped by a delivery of a signal
             fprintf(stderr, ERR_PREFIX "child was not stopped by a delivery of a signal\n");
@@ -279,13 +291,45 @@ int libsandbox_fork(char * * command_argv, struct libsandbox_rules * rules, void
 
 }
 
+int libsandbox_syscall_allow(void * ctx_private){
+    struct ctx_private * ctx_priv = ctx_private;
+
+    if(ptrace(PTRACE_CONT, ctx_priv->evaluated_subprocess_pid, NULL, NULL)){
+        fprintf(stderr, ERR_PREFIX "could not PTRACE_CONT\n");
+        return 1;
+    }
+
+    return 0;
+}
+
+int libsandbox_syscall_deny(void * ctx_private){
+    struct ctx_private * ctx_priv = ctx_private;
+
+    ctx_priv->syscalls_blocked += 1;
+
+    const char * name = get_syscall_name(ctx_priv->evaluated_syscall_id);
+    printf(PRINT_PREFIX "blocked syscall with id `%ld` (%s)\n", ctx_priv->evaluated_syscall_id, name);
+
+    CPU_REG_RW_SYSCALL_ID (ctx_priv->evaluated_cpu_regs) = -1; // invalidate the syscall by changing the ID
+    CPU_REG_RW_SYSCALL_RET(ctx_priv->evaluated_cpu_regs) = -1; // also put bad return code, suprisingly this fixes some programs (example: python3)
+
+    // there is might be a way to only set the syscall id reg, and not all of them
+    // but it might not necessarily be portable
+    if(ptrace(PTRACE_SETREGS, ctx_priv->evaluated_subprocess_pid, NULL, & ctx_priv->evaluated_cpu_regs)){
+        printf(ERR_PREFIX "could not PTRACE_SETREGS\n");
+        return 1;
+    }
+
+    return 1;
+}
+
 // TODO? make it so that if this exits with LIBSANDBOX_RESULT_ERROR it kills all processes
 // perhaps do it also when finished just to be sure?
-enum libsandbox_result libsandbox_next_syscall(void * ctx_private, struct libsandbox_summary * summary){
+enum libsandbox_result libsandbox_next_syscall(void * ctx_private, struct libsandbox_summary * summary, char * access_attempt_path, size_t access_attempt_path_size){
     struct ctx_private * ctx_priv = ctx_private;
 
     int status;
-    pid_t pid = waitpid(-1, &status, 0);
+    pid_t pid = waitpid(-1, & status, 0);
     // the first argument being -1 means: wait for any child process
     // `waitpid` returns when a child's state changes, and that means: the child terminated, the child was stopped by a signal, or the child was resumed by a signal
 
@@ -323,7 +367,7 @@ enum libsandbox_result libsandbox_next_syscall(void * ctx_private, struct libsan
         ctx_priv->processes_running -= 1;
 
         unsigned long event_message;
-        if(ptrace(PTRACE_GETEVENTMSG, pid, NULL, &event_message)){
+        if(ptrace(PTRACE_GETEVENTMSG, pid, NULL, & event_message)){
             fprintf(stderr, ERR_PREFIX "could not PTRACE_GETEVENTMSG\n");
             return LIBSANDBOX_RESULT_ERROR;
         }
@@ -385,50 +429,51 @@ enum libsandbox_result libsandbox_next_syscall(void * ctx_private, struct libsan
     }
 
     // get CPU regs
-    struct user_regs_struct cpu_regs;
-    if(ptrace(PTRACE_GETREGS, pid, NULL, &cpu_regs)){
+    if(ptrace(PTRACE_GETREGS, pid, NULL, & ctx_priv->evaluated_cpu_regs)){
         fprintf(stderr, ERR_PREFIX "could not PTRACE_GETREGS\n");
         return LIBSANDBOX_RESULT_ERROR;
     }
 
-    long syscall_id = CPU_REG_RW_SYSCALL_ID(cpu_regs);
+    ctx_priv->evaluated_subprocess_pid = pid;
+    ctx_priv->evaluated_syscall_id = CPU_REG_RW_SYSCALL_ID(ctx_priv->evaluated_cpu_regs);
 
-    int allow_syscall = 0;
+    switch(ctx_priv->evaluated_syscall_id){
 
-    switch(syscall_id){
+            case SYS_creat:
+            case SYS_open:
+            case SYS_mknod:
+            case SYS_truncate:
+            case SYS_mkdir:
+            case SYS_rmdir:
+            case SYS_chdir:
+            case SYS_chroot:
+            case SYS_unlink:
+            case SYS_readlink:
+            case SYS_stat:
+            case SYS_lstat:
+            case SYS_chmod:
+            case SYS_unlinkat:
+            case SYS_readlinkat:
+            case SYS_chown:
+            case SYS_lchown: // does not dereference symlinks
+            case SYS_utime:
+            case SYS_utimes:
+            case SYS_access:{
 
-        case SYS_creat:{
-            allow_syscall = 1;
-            // TODO actually check the path
+            if(extract_pathlink_arg0(ctx_priv->root_process_pid, & ctx_priv->evaluated_cpu_regs, access_attempt_path, access_attempt_path_size)){
+                return LIBSANDBOX_RESULT_ERROR;
+            }
+
+            return LIBSANDBOX_RESULT_ACCESS_ATTEMPT_PATH;
+
         }break;
 
         default:{
-            const char * name = get_syscall_name(syscall_id);
-            fprintf(stderr, ERR_PREFIX "unknown syscal with id `%ld` (%s); this is a bug that needs to be reported\n", syscall_id, name);
+            const char * name = get_syscall_name(ctx_priv->evaluated_syscall_id);
+            fprintf(stderr, ERR_PREFIX "unknown syscal with id `%ld` (%s); this is a bug that needs to be reported\n", ctx_priv->evaluated_syscall_id, name);
             return LIBSANDBOX_RESULT_ERROR;
         }break;
 
-    }
-
-    if(!allow_syscall){
-
-        ctx_priv->syscalls_blocked += 1;
-
-        const char * name = get_syscall_name(syscall_id);
-        printf(PRINT_PREFIX "blocked syscall with id `%ld` (%s)\n", syscall_id, name);
-
-        CPU_REG_RW_SYSCALL_ID(cpu_regs) = -1; // invalidate the syscall by changing the ID
-        CPU_REG_RW_SYSCALL_RET(cpu_regs) = -1; // also put bad return code, suprisingly this fixes some programs (example: python3)
-
-        // there is might be a way to only set the syscall id reg, and not all of them
-        // but it might not necessarily be portable
-        ptrace(PTRACE_SETREGS, pid, NULL, &cpu_regs);
-
-    }
-
-    if(ptrace(PTRACE_CONT, pid, NULL, NULL)){
-        fprintf(stderr, ERR_PREFIX "could not PTRACE_CONT\n");
-        return LIBSANDBOX_RESULT_ERROR;
     }
 
     return LIBSANDBOX_RESULT_CONTINUE;

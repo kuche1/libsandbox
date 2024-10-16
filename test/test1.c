@@ -32,8 +32,8 @@ int main(void){
     libsandbox_rules_init(& rules, 0); // `1` stands for permissive, `0` for non-permissive
     // rules.filesystem_allow_metadata = 1;
 
-    size_t size_ctx_private = libsandbox_get_ctx_private_size();
-    char ctx_private[size_ctx_private];
+    size_t ctx_private_size = libsandbox_get_ctx_private_size();
+    char ctx_private[ctx_private_size];
 
     if(libsandbox_fork(command_argv, & rules, ctx_private)){
         printf("fork failed\n");
@@ -44,9 +44,11 @@ int main(void){
 
     struct libsandbox_summary summary;
 
+    char path[400];
+
     for(int running = 1; running;){
 
-        switch(libsandbox_next_syscall(ctx_private, & summary)){
+        switch(libsandbox_next_syscall(ctx_private, & summary, path, sizeof(path))){
 
             case LIBSANDBOX_RESULT_CONTINUE:{
                 // pass
@@ -59,6 +61,11 @@ int main(void){
             case LIBSANDBOX_RESULT_ERROR:{
                 printf("something went wrong\n");
                 return 1;
+            }break;
+
+            case LIBSANDBOX_RESULT_ACCESS_ATTEMPT_PATH:{
+                printf("attempt to access path `%s`\n", path);
+                libsandbox_syscall_allow(ctx_private);
             }break;
 
         }
