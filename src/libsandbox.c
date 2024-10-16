@@ -498,6 +498,8 @@ enum libsandbox_result libsandbox_next_syscall(void * ctx_private, struct libsan
                     path_extractor_fnc = extract_arg0pathlinkA_arg1dirfdB_arg2pathlinkB;
                 }break;
 
+                // TODO there are more syscalls mising here
+
             default:{
                 const char * name = get_syscall_name(ctx_priv->evaluated_syscall_id);
                 fprintf(stderr, ERR_PREFIX "unknown syscal with id `%ld` (%s); this is a bug that needs to be reported\n", ctx_priv->evaluated_syscall_id, name);
