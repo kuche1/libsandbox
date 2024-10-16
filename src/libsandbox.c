@@ -12,6 +12,7 @@
 #include <sys/user.h> // user_regs_struct
 #include <sys/syscall.h> // SYS_*
 #include <fcntl.h> // AT_FDCWD
+#include <sys/stat.h> // stat
 
 #define PRINT_PREFIX LIBSANDBOX_PRINT_PREFIX
 #define ERR_PREFIX PRINT_PREFIX "ERROR: "
@@ -492,10 +493,9 @@ enum libsandbox_result libsandbox_next_syscall(void * ctx_private, struct libsan
                     path_extractor_fnc = extract_arg0pathlink_arg1pathlink;
                 }break;
 
-                // TODO
-                // case SYS_symlink:{
-                //     path_extractor_fnc = extract_arg0pathlinkA_arg1dirfdB_arg2pathlinkB;
-                // }break;
+                case SYS_symlinkat:{
+                    path_extractor_fnc = extract_arg0pathlinkA_arg1dirfdB_arg2pathlinkB;
+                }break;
 
             default:{
                 const char * name = get_syscall_name(ctx_priv->evaluated_syscall_id);

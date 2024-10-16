@@ -28,19 +28,19 @@ int main(void){
     //     NULL,
     // };
 
-    char * command_argv [] = {
-        "bash",
-        "-c",
-        "cat test.sh",
-        NULL,
-    };
-
     // char * command_argv [] = {
     //     "bash",
     //     "-c",
-    //     "ln -s a b",
+    //     "cat test.sh",
     //     NULL,
     // };
+
+    char * command_argv [] = {
+        "bash",
+        "-c",
+        "ln -s a b",
+        NULL,
+    };
 
     struct libsandbox_rules rules;
     libsandbox_rules_init(& rules, 0); // `1` stands for permissive, `0` for non-permissive
