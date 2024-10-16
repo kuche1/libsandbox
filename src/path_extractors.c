@@ -87,9 +87,9 @@ static int extract_arg0dirfd_arg1pathlink(pid_t pid, struct user_regs_struct * c
     // int dir_fd = CPU_REG_R_SYSCALL_ARG0(* cpu_regs);
     // TODO
 
-    char * path_cstr = (char *) CPU_REG_R_SYSCALL_ARG1(* cpu_regs);
+    char * pidmem_str = (char *) CPU_REG_R_SYSCALL_ARG1(* cpu_regs);
 
-    if(extract_pathraw_addr(pid, path_cstr, path, path_size)){
+    if(extract_pathraw_addr(pid, pidmem_str, path, path_size)){
         return 1;
     }
 
