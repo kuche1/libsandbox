@@ -100,8 +100,7 @@ static int extract_pathlink_pidmemstr(pid_t pid, char * pidmem_str, char * path,
 }
 
 // `path_actually_written_bytes` does not include the ending \0
-// TODO for this and all similar functions: instead of adding an additional argument, the bytes read could simply be returned
-static int extract_pathlink_pidmemdirfd(pid_t pid, int pidmem_dirfd, char * path, size_t path_size, size_t * path_actually_written_bytes){
+static ssize_t extract_pathlink_pidmemdirfd(pid_t pid, int pidmem_dirfd, char * path, size_t path_size){
 
     char file_containing_dirfd[100];
 
@@ -115,17 +114,21 @@ static int extract_pathlink_pidmemdirfd(pid_t pid, int pidmem_dirfd, char * path
 
     if(written < 0){
         fprintf(stderr, ERR_PREFIX "`snprintf` failure\n");
-        return 1;
+        return -1;
     }
 
     if((long unsigned int) written >= sizeof(file_containing_dirfd)){
         fprintf(stderr, ERR_PREFIX "not enough memory in temporary buffer; this is a bug that needs to be reported\n");
-        return 1;
+        return -1;
     }
 
     if(pidmem_dirfd == AT_FDCWD){
 
-        return extract_pathlink(file_containing_dirfd, path, path_size, path_actually_written_bytes);
+        size_t path_actually_written_bytes;
+        if(extract_pathlink(file_containing_dirfd, path, path_size, & path_actually_written_bytes)){
+            return -1;
+        }
+        return path_actually_written_bytes;
 
     }else{
 
@@ -136,13 +139,13 @@ static int extract_pathlink_pidmemdirfd(pid_t pid, int pidmem_dirfd, char * path
         FILE * f = fopen(file_containing_dirfd, "rb");
         if(!f){
             fprintf(stderr, ERR_PREFIX "could not open file containing dirfd `%s`\n", file_containing_dirfd);
-            return 1;
+            return -1;
         }
 
         if(fseek(f, 0, SEEK_END)){
             fprintf(stderr, ERR_PREFIX "`fseek` failure\n");
             fclose(f);
-            return 1;
+            return -1;
         }
 
         long actual_path_size = ftell(f);
@@ -150,7 +153,7 @@ static int extract_pathlink_pidmemdirfd(pid_t pid, int pidmem_dirfd, char * path
         if(actual_path_size < 0){
             fprintf(stderr, ERR_PREFIX "`ftell` failure\n");
             fclose(f);
-            return 1;
+            return -1;
         }
 
         rewind(f);
@@ -158,13 +161,13 @@ static int extract_pathlink_pidmemdirfd(pid_t pid, int pidmem_dirfd, char * path
         if(path_size <= 0){
             fprintf(stderr, ERR_PREFIX "provided buffer size is <= 0\n");
             fclose(f);
-            return 1;
+            return -1;
         }
 
         if((size_t) actual_path_size > path_size - 1){
             fprintf(stderr, ERR_PREFIX "not enough memory for the actual path\n");
             fclose(f);
-            return 1;
+            return -1;
         }
 
         size_t read = fread(path, 1, path_size - 1, f);
@@ -172,16 +175,14 @@ static int extract_pathlink_pidmemdirfd(pid_t pid, int pidmem_dirfd, char * path
         if(read != (size_t) actual_path_size){
             fprintf(stderr, ERR_PREFIX "`fread` failure\n");
             fclose(f);
-            return 1;
+            return -1;
         }
 
         fclose(f);
 
         path[read] = 0;
 
-        * path_actually_written_bytes = read;
-
-        return 0;
+        return read;
 
     }
 
@@ -222,11 +223,13 @@ static int extract_arg0dirfd_arg1pathlink(pid_t pid, struct user_regs_struct * c
 
     int pidmem_dirfd = CPU_REG_R_SYSCALL_ARG0(* cpu_regs);
 
-    size_t path_len;
+    ssize_t path_len_ssize = extract_pathlink_pidmemdirfd(pid, pidmem_dirfd, path, path_size);
 
-    if(extract_pathlink_pidmemdirfd(pid, pidmem_dirfd, path, path_size, & path_len)){
+    if(path_len_ssize < 0){
         return 1;
     }
+
+    size_t path_len = path_len_ssize;
 
     // add separator
 
@@ -240,7 +243,7 @@ static int extract_arg0dirfd_arg1pathlink(pid_t pid, struct user_regs_struct * c
 
     // add file
 
-    if(path_len + filename_len >= path_size){
+    if(path_len + filename_len + 1 >= path_size){
         fprintf(stderr, ERR_PREFIX "not enough memory in buffer\n");
         return 1;
     }
