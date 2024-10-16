@@ -1,6 +1,8 @@
 
 #include "libsandbox.h"
 
+#include "get_syscall_name.c"
+
 #include <unistd.h> // fork
 #include <sys/ptrace.h> // ptrace
 #include <stdio.h> // fprintf
@@ -400,7 +402,8 @@ enum libsandbox_result libsandbox_next_syscall(void * ctx_private, struct libsan
         }break;
 
         default:{
-            fprintf(stderr, ERR_PREFIX "unknown syscal with id `%ld`; this is a bug that needs to be reported\n", syscall_id);
+            const char * name = get_syscall_name(syscall_id);
+            fprintf(stderr, ERR_PREFIX "unknown syscal with id `%ld` (%s); this is a bug that needs to be reported\n", syscall_id, name);
             return LIBSANDBOX_RESULT_ERROR;
         }break;
 
@@ -410,7 +413,8 @@ enum libsandbox_result libsandbox_next_syscall(void * ctx_private, struct libsan
 
         ctx_priv->syscalls_blocked += 1;
 
-        printf(PRINT_PREFIX "blocked syscall with id `%ld`\n", syscall_id);
+        const char * name = get_syscall_name(syscall_id);
+        printf(PRINT_PREFIX "blocked syscall with id `%ld` (%s)\n", syscall_id, name);
 
         CPU_REG_RW_SYSCALL_ID(cpu_regs) = -1; // invalidate the syscall by changing the ID
         CPU_REG_RW_SYSCALL_RET(cpu_regs) = -1; // also put bad return code, suprisingly this fixes some programs (example: python3)
