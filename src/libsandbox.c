@@ -461,13 +461,13 @@ enum libsandbox_result libsandbox_next_syscall(void * ctx_private, struct libsan
                 case SYS_utimes:
                 case SYS_access:{
 
-                if(extract_pathlink_arg0(ctx_priv->root_process_pid, & ctx_priv->evaluated_cpu_regs, access_attempt_path, access_attempt_path_size)){
-                    return LIBSANDBOX_RESULT_ERROR;
-                }
+                    if(extract_pathlink_arg0(ctx_priv->root_process_pid, & ctx_priv->evaluated_cpu_regs, access_attempt_path, access_attempt_path_size)){
+                        return LIBSANDBOX_RESULT_ERROR;
+                    }
 
-                return LIBSANDBOX_RESULT_ACCESS_ATTEMPT_PATH;
+                    return LIBSANDBOX_RESULT_ACCESS_ATTEMPT_PATH;
 
-            }break;
+                }break;
 
             default:{
                 const char * name = get_syscall_name(ctx_priv->evaluated_syscall_id);
