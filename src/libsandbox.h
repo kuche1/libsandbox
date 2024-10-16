@@ -19,6 +19,6 @@ size_t libsandbox_get_ctx_private_size(void);
 
 int libsandbox_fork(char * * command_argv, void * ctx_private);
 // `command_argv` needs to be null-terminated
-// `ctx_private` needs to be a pointer to memory of length `libsandbox_get_ctx_private_size()`
+// `ctx_private` needs to be a pointer to memory of size `libsandbox_get_ctx_private_size()`
 
 enum libsandbox_result libsandbox_next_syscall(void * ctx_private, struct libsandbox_summary * summary);
