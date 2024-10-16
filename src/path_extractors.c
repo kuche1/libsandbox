@@ -8,43 +8,51 @@
 ////////// low level
 //////////
 
-// static int extract_pathlink(char * path_raw, char * path, size_t path_size, size_t * path_actually_written_bytes);
+static int extract_pathlink(pid_t pid, char * path_raw, char * path, size_t path_size, size_t * path_actually_written_bytes);
 
 // static int file_or_folder_exists(char * path){
 //     struct stat buffer;
 //     return (stat(path, &buffer) == 0);
 // }
 
-// // return: (negative on err) or (number of bytes written excluding \0)
-// static ssize_t extract_cwd(pid_t pid, size_t path_size, char * path){
+// return: (negative on err) or (number of bytes written excluding \0)
+static ssize_t extract_cwd(pid_t pid, size_t path_size, char * path){
 
-//     char link_to_cwd[100];
+    char link_to_cwd[100];
 
-//     int written;
+    int written;
 
-//     written = snprintf(link_to_cwd, sizeof(link_to_cwd), "/proc/%d/cwd", pid);
+    written = snprintf(link_to_cwd, sizeof(link_to_cwd), "/proc/%d/cwd", pid);
 
-//     if(written < 0){
-//         fprintf(stderr, ERR_PREFIX "`snprintf` failure\n");
-//         return -1;
-//     }
+    if(written < 0){
+        fprintf(stderr, ERR_PREFIX "`snprintf` failure\n");
+        return -1;
+    }
 
-//     if((long unsigned int) written >= sizeof(link_to_cwd)){
-//         fprintf(stderr, ERR_PREFIX "not enough memory in temporary buffer; this is a bug that needs to be reported\n");
-//         return -1;
-//     }
+    if((long unsigned int) written >= sizeof(link_to_cwd)){
+        fprintf(stderr, ERR_PREFIX "not enough memory in temporary buffer; this is a bug that needs to be reported\n");
+        return -1;
+    }
 
-//     size_t path_actually_written_bytes;
+    ssize_t len_or_err = readlink(link_to_cwd, path, path_size - 1);
 
-//     // this will not cause infinite recursion since the file must exist
-//     // and even if it doesn't we'll get an error in there
-//     if(extract_pathlink(link_to_cwd, path, path_size, & path_actually_written_bytes)){
-//         return -1;
-//     }
+    if(len_or_err < 0){
+        fprintf(stderr, ERR_PREFIX "`readlink` failure\n");
+        return -1;
+    }
 
-//     return path_actually_written_bytes;
+    size_t len = len_or_err;
 
-// }
+    if(len == path_size - 1){
+        fprintf(stderr, ERR_PREFIX "buf too small\n");
+        return -1;
+    }
+
+    path[len] = 0;
+
+    return len;
+
+}
 
 // returns how much bytes have been written (excluding the last \0), or negative if error
 static ssize_t extract_pathraw_addr(pid_t pid, char * addr, char * path, size_t path_size){
@@ -93,28 +101,52 @@ static ssize_t extract_pathraw_addr(pid_t pid, char * addr, char * path, size_t 
 }
 
 // `path_actually_written_bytes` does not include the ending \0
-static int extract_pathlink(char * path_raw, char * path, size_t path_size, size_t * path_actually_written_bytes){
+static int extract_pathlink(pid_t pid, char * path_raw, char * path, size_t path_size, size_t * path_actually_written_bytes){
 
     if(path_size <= 0){
         fprintf(stderr, ERR_PREFIX "provided buffer size is <= 0\n");
         return 1;
     }
 
-    ssize_t path_dereferenced_len_or_err = readlink(path_raw, path, path_size - 1);
+    char process_cwd[path_size];
+
+    ssize_t process_cwd_len = extract_cwd(pid, sizeof(process_cwd), process_cwd);
+    if(process_cwd_len < 0){
+        fprintf(stderr, ERR_PREFIX "could not extract cwd of process with pid `%d`\n", pid);
+        return 1;
+    }
+
+    int process_cwd_dirfd = open(process_cwd, O_RDONLY | O_DIRECTORY);
+    if(process_cwd_dirfd < 0){
+        fprintf(stderr, ERR_PREFIX "could not open cwd of process with pid `%d` (location is `%s`)\n", pid, process_cwd);
+        return 1;
+    }
+
+    ssize_t path_dereferenced_len_or_err = readlinkat(process_cwd_dirfd, path_raw, path, path_size - 1);
+    int path_dereferenced_len_or_err_errno = errno;
+
+    close(process_cwd_dirfd);
 
     if(path_dereferenced_len_or_err < 0){
 
-        if(errno == ENOENT){
+        if(path_dereferenced_len_or_err_errno == ENOENT){
             // we're trying to dereference a non-existant file/folder, no wonder it's failing
 
-            fprintf(stderr, ERR_PREFIX "TODO fix - just glue it to the cwd\n");
-            return 1;
+            int path_len = extract_cwd(pid, path_size, path);
 
+            if(path_len < 0){
+                return 1;
+            }
 
+            * path_actually_written_bytes = path_len;
+
+            // TODO actually fucking glue the path
+
+            return 0;
 
         }
 
-        fprintf(stderr, ERR_PREFIX "could not dereference existing path `%s`\n", path_raw);
+        fprintf(stderr, ERR_PREFIX "could not dereference non-ENOENT path `%s`\n", path_raw);
         return 1;
 
         // TODO this should be it's own function
@@ -171,7 +203,7 @@ static ssize_t extract_pathlink_pidmemstr(pid_t pid, char * pidmem_str, char * p
     }
 
     size_t path_actually_written_bytes; // TODO look for this `path_actually_written_bytes` everywhere in the code and get rid of it
-    if(extract_pathlink(path_raw, path, path_size, & path_actually_written_bytes)){
+    if(extract_pathlink(pid, path_raw, path, path_size, & path_actually_written_bytes)){
         return -1;
     }
 
@@ -205,7 +237,7 @@ static ssize_t extract_pathlink_pidmemdirfd(pid_t pid, int pidmem_dirfd, char * 
     if(pidmem_dirfd == AT_FDCWD){
 
         size_t path_actually_written_bytes;
-        if(extract_pathlink(file_containing_dirfd, path, path_size, & path_actually_written_bytes)){
+        if(extract_pathlink(pid, file_containing_dirfd, path, path_size, & path_actually_written_bytes)){
             return -1;
         }
         return path_actually_written_bytes;
