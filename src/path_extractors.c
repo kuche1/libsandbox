@@ -145,7 +145,12 @@ static int extract_pathlink(pid_t pid, char * path_raw, char * path, size_t path
                 return 1;
             }
 
-            // TODO actually fucking glue the path
+            if(str_append_str(path, path_size, & path_len, path_raw)){
+                fprintf(stderr, ERR_PREFIX "buf too small\n");
+                return 1;
+            }
+
+            // TODO and what if it's a fucking full path?
 
             * path_actually_written_bytes = path_len;
 
@@ -156,31 +161,6 @@ static int extract_pathlink(pid_t pid, char * path_raw, char * path, size_t path
         fprintf(stderr, ERR_PREFIX "could not dereference non-ENOENT path `%s`\n", path_raw);
         return 1;
 
-        // TODO this should be it's own function
-        // TODO what if its not a fucking full path
-
-        // * path_actually_written_bytes = 0;
-
-        // for(;path_size;){
-
-        //     char ch = path[0];
-
-        //     path_raw[0] = ch;
-
-        //     if(ch == 0){
-        //         return 0;
-        //     }
-
-        //     path += 1;
-        //     path_raw += 1;
-        //     * path_actually_written_bytes += 1;
-        //     path_size -= 1;
-
-        // }
-
-        // fprintf(stderr, ERR_PREFIX "buffer too small\n");
-
-        // return 1;
     }
 
     size_t path_dereferenced_len = path_dereferenced_len_or_err;
@@ -322,6 +302,7 @@ static inline int extract_pidmemdirfd_pathlink(pid_t pid, int pidmem_dirfd, char
         return -1;
     }
 
+    // TODO we now have a string operations library, so use that instead AND for the `strcpy` at the bottom
     if(filename[0] == '/'){ // we CAN check [0] - worst case scenario it's \0
         // it's a full path
         strcpy(path, filename);
