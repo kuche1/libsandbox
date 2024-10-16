@@ -10,7 +10,9 @@ struct libsandbox_sandbox_data{
     int return_code;
 };
 
-int libsandbox_fork(char * * command_argv, void * * ctx_private);
+size_t libsandbox_get_ctx_private_size(void);
+
+int libsandbox_fork(char * * command_argv, void * ctx_private);
 // `command_argv` needs to be null-terminated
 
 int libsandbox_next_syscall(struct libsandbox_sandbox_data * ctx, void * ctx_private);

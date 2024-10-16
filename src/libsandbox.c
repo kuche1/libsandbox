@@ -9,7 +9,6 @@
 #include <seccomp.h> // scmp_filter_ctx
 #include <string.h> // strerror
 #include <errno.h> // errno
-#include <stdlib.h> // malloc
 
 #define LIBSANDBOX_ERR_PREFIX LIBSANDBOX_PRINT_PREFIX "ERROR: "
 
@@ -56,7 +55,12 @@ static inline int set_seccomp_rules(void){
 
 }
 
-int libsandbox_fork(char * * command_argv, void * * ctx_private){
+size_t libsandbox_get_ctx_private_size(void){
+    return sizeof(struct ctx_private);
+}
+
+int libsandbox_fork(char * * command_argv, void * ctx_private){
+    struct ctx_private * ctx_priv = ctx_private;
 
     if(command_argv[0] == NULL){
         fprintf(stderr, LIBSANDBOX_ERR_PREFIX "command name not specified\n");
@@ -135,24 +139,9 @@ int libsandbox_fork(char * * command_argv, void * * ctx_private){
 
     }
 
-    struct ctx_private * ctx_priv;
-
-    // TODO
-    // would be cool if we got rid of the malloc requirement
-    // make something like `libsandbox_get_ctx_priv_size` and it would just return
-    // `sizeof(struct ctx_priv)`
-    ctx_priv = malloc(sizeof(* ctx_priv));
-    if(!ctx_priv){
-        fprintf(stderr, LIBSANDBOX_ERR_PREFIX "could not allocate enough memory for private context\n");
-        sigkill_or_print_err(child);
-        return -1;
-    }
-
     ctx_priv->sandboxed_process_pid = child;
     ctx_priv->processes_running = 1;
     ctx_priv->processes_failed = 0;
-
-    * ctx_private = ctx_priv;
 
     return 0;
 

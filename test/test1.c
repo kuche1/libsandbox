@@ -1,27 +1,30 @@
 
 #include "../src/libsandbox.h"
 
-#include <stdio.h>
+#include <stdio.h> // printf
 #include <unistd.h> // sleep
+#include <stdlib.h> // malloc
 
 int main(void){
 
-    char * command_argv [] = {
-        "echo",
-        "asd 123",
-        "4567",
-        NULL,
-    };
-
     // char * command_argv [] = {
-    //     "bash",
-    //     "-c",
-    //     "exit 69",
+    //     "echo",
+    //     "asd 123",
+    //     "4567",
     //     NULL,
     // };
 
-    void * ctx_private = NULL;
-    if(libsandbox_fork(command_argv, & ctx_private)){
+    char * command_argv [] = {
+        "bash",
+        "-c",
+        "exit 69",
+        NULL,
+    };
+
+    size_t size_ctx_private = libsandbox_get_ctx_private_size();
+    char ctx_private[size_ctx_private];
+
+    if(libsandbox_fork(command_argv, ctx_private)){
         return 1;
     }
 
