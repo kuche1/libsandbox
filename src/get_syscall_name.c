@@ -3,7 +3,7 @@
 
 #include <sys/syscall.h> // SYS_*
 
-const char * get_syscall_name(long syscall_id){
+static const char * get_syscall_name(long syscall_id){
 
     switch(syscall_id) {
 
