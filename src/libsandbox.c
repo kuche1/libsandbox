@@ -132,7 +132,7 @@ int libsandbox_fork(char * * command_argv, pid_t * new_process_pid){
 
 }
 
-int libsandbox_next_syscall(pid_t sandboxed_process_pid, int * finished, int * return_code, int * processes_running, int * processes_failed){
+int libsandbox_next_syscall(struct libsandbox_sandbox_data * ctx){
 
     int status;
     pid_t pid = waitpid(-1, &status, 0);
@@ -157,7 +157,7 @@ int libsandbox_next_syscall(pid_t sandboxed_process_pid, int * finished, int * r
     ){
 
         // new process was created
-        * processes_running += 1;
+        ctx->processes_running += 1;
         if(ptrace(PTRACE_CONT, pid, NULL, NULL)){
             fprintf(stderr, LIBSANDBOX_ERR_PREFIX "could not PTRACE_CONT\n");
             return 1;
@@ -170,7 +170,7 @@ int libsandbox_next_syscall(pid_t sandboxed_process_pid, int * finished, int * r
 
         // process died
 
-        * processes_running -= 1;
+        ctx->processes_running -= 1;
 
         unsigned long event_message;
         if(ptrace(PTRACE_GETEVENTMSG, pid, NULL, &event_message)){
@@ -183,11 +183,11 @@ int libsandbox_next_syscall(pid_t sandboxed_process_pid, int * finished, int * r
         if(code){
             // note that it might be the case that the return code signifies something else
             // rather than success/failure
-            * processes_failed += 1;
+            ctx->processes_failed += 1;
         }
 
-        if(pid == sandboxed_process_pid){
-            * return_code = code;
+        if(pid == ctx->sandboxed_process_pid){
+            ctx->return_code = code;
         }
 
         if(ptrace(PTRACE_CONT, pid, NULL, NULL)){
@@ -195,8 +195,8 @@ int libsandbox_next_syscall(pid_t sandboxed_process_pid, int * finished, int * r
             return 1;
         }
 
-        if(* processes_running <= 0){
-            * finished = 1;
+        if(ctx->processes_running <= 0){
+            ctx->finished = 1;
         }
 
         return 0;

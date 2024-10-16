@@ -20,19 +20,24 @@ int main(void){
 
     printf("forked successfully\n");
 
-    int finished = 0;
-    int processes_running = 1;
-    int processes_failed = 0;
-    int return_code = 0;
+    // TODO this should be returned by libsandbox_fork
+    // also it would be best if we made 2 structs, 1 for internal things, and 1 for external
+    struct libsandbox_sandbox_data ctx = {
+        .sandboxed_process_pid = pid,
+        .finished = 0,
+        .return_code = 0,
+        .processes_running = 1,
+        .processes_failed = 0,
+    };
 
     for(;;){
-        int fail = libsandbox_next_syscall(pid, & finished, & return_code, & processes_running, & processes_failed);
+        int fail = libsandbox_next_syscall(& ctx);
         if(fail){
             printf("something went wrong\n");
             return 1;
         }
 
-        if(finished){
+        if(ctx.finished){
             break;
         }
     }
@@ -41,7 +46,7 @@ int main(void){
 
     // execvp(command_argv[0], command_argv);
 
-    printf("all done\n");
+    printf("process finished; return code: %d\n", ctx.return_code);
 
     return 0;
 }
