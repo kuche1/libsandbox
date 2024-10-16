@@ -9,8 +9,24 @@
 #include <seccomp.h> // scmp_filter_ctx
 #include <string.h> // strerror
 #include <errno.h> // errno
+#include <sys/user.h> // user_regs_struct
+#include <sys/syscall.h> // SYS_*
 
-#define ERR_PREFIX LIBSANDBOX_PRINT_PREFIX "ERROR: "
+#define PRINT_PREFIX LIBSANDBOX_PRINT_PREFIX
+#define ERR_PREFIX PRINT_PREFIX "ERROR: "
+
+// `RW` means that we can both read and write to the register
+// `R` means that the register is read-only
+#if __WORDSIZE == 64
+    #define CPU_REG_RW_SYSCALL_ID(cpu_regs) cpu_regs.orig_rax
+    #define CPU_REG_R_SYSCALL_ARG0(cpu_regs) cpu_regs.rdi
+    #define CPU_REG_R_SYSCALL_ARG1(cpu_regs) cpu_regs.rsi
+    #define CPU_REG_R_SYSCALL_ARG2(cpu_regs) cpu_regs.rdx
+    #define CPU_REG_R_SYSCALL_ARG3(cpu_regs) cpu_regs.r10
+    #define CPU_REG_RW_SYSCALL_RET(cpu_regs) cpu_regs.rax // the return code of the syscall
+#else
+    #error Only 64bit is supported for now
+#endif
 
 #define SECCOMP_RULE_ADD(...) { \
     int ret = seccomp_rule_add(__VA_ARGS__); \
@@ -24,6 +40,7 @@ struct ctx_private{
     pid_t root_process_pid;
     int processes_running;
     int processes_failed;
+    int syscalls_blocked;
 };
 
 static inline void sigkill_or_print_err(pid_t pid){
@@ -253,11 +270,14 @@ int libsandbox_fork(char * * command_argv, struct libsandbox_rules * rules, void
     ctx_priv->root_process_pid = child;
     ctx_priv->processes_running = 1;
     ctx_priv->processes_failed = 0;
+    ctx_priv->syscalls_blocked = 0;
 
     return 0;
 
 }
 
+// TODO? make it so that if this exits with LIBSANDBOX_RESULT_ERROR it kills all processes
+// perhaps do it also when finished just to be sure?
 enum libsandbox_result libsandbox_next_syscall(void * ctx_private, struct libsandbox_summary * summary){
     struct ctx_private * ctx_priv = ctx_private;
 
@@ -361,8 +381,46 @@ enum libsandbox_result libsandbox_next_syscall(void * ctx_private, struct libsan
 
     }
 
-    // TODO the code for the filtering should go here
-    // currently we're allowing everything
+    // get CPU regs
+    struct user_regs_struct cpu_regs;
+    if(ptrace(PTRACE_GETREGS, pid, NULL, &cpu_regs)){
+        fprintf(stderr, ERR_PREFIX "could not PTRACE_GETREGS\n");
+        return LIBSANDBOX_RESULT_ERROR;
+    }
+
+    long syscall_id = CPU_REG_RW_SYSCALL_ID(cpu_regs);
+
+    int allow_syscall = 0;
+
+    switch(syscall_id){
+
+        case SYS_creat:{
+            allow_syscall = 1;
+            // TODO actually check the path
+        }break;
+
+        default:{
+            fprintf(stderr, ERR_PREFIX "unknown syscal with id `%ld`; this is a bug that needs to be reported\n", syscall_id);
+            return LIBSANDBOX_RESULT_ERROR;
+        }break;
+
+    }
+
+    if(!allow_syscall){
+
+        ctx_priv->syscalls_blocked += 1;
+
+        printf(PRINT_PREFIX "blocked syscall with id `%ld`\n", syscall_id);
+
+        CPU_REG_RW_SYSCALL_ID(cpu_regs) = -1; // invalidate the syscall by changing the ID
+        CPU_REG_RW_SYSCALL_RET(cpu_regs) = -1; // also put bad return code, suprisingly this fixes some programs (example: python3)
+
+        // there is might be a way to only set the syscall id reg, and not all of them
+        // but it might not necessarily be portable
+        ptrace(PTRACE_SETREGS, pid, NULL, &cpu_regs);
+
+    }
+
     if(ptrace(PTRACE_CONT, pid, NULL, NULL)){
         fprintf(stderr, ERR_PREFIX "could not PTRACE_CONT\n");
         return LIBSANDBOX_RESULT_ERROR;
