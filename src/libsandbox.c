@@ -304,7 +304,7 @@ int libsandbox_syscall_deny(void * ctx_private){
     struct ctx_private * ctx_priv = ctx_private;
 
     const char * name = get_syscall_name(ctx_priv->evaluated_syscall_id);
-    printf(PRINT_PREFIX "blocked syscall with id `%ld` (%s)\n", ctx_priv->evaluated_syscall_id, name);
+    printf(PRINT_PREFIX "blocking syscall with id `%ld` (%s)\n", ctx_priv->evaluated_syscall_id, name);
 
     CPU_REG_RW_SYSCALL_ID (ctx_priv->evaluated_cpu_regs) = -1; // invalidate the syscall by changing the ID
     CPU_REG_RW_SYSCALL_RET(ctx_priv->evaluated_cpu_regs) = -1; // also put bad return code, suprisingly this fixes some programs (example: python3)
@@ -316,7 +316,12 @@ int libsandbox_syscall_deny(void * ctx_private){
         return 1;
     }
 
-    return 1;
+    if(ptrace(PTRACE_CONT, ctx_priv->evaluated_subprocess_pid, NULL, NULL)){
+        fprintf(stderr, ERR_PREFIX "could not PTRACE_CONT\n");
+        return 1;
+    }
+
+    return 0;
 }
 
 // TODO? make it so that if this exits with LIBSANDBOX_RESULT_ERROR it kills all processes
@@ -438,6 +443,9 @@ enum libsandbox_result libsandbox_next_syscall(void * ctx_private, struct libsan
         ctx_priv->evaluated_subprocess_pid = pid;
         ctx_priv->evaluated_syscall_id = CPU_REG_RW_SYSCALL_ID(ctx_priv->evaluated_cpu_regs);
 
+        // functon pointer
+        int (*path_extractor_fnc)(pid_t, struct user_regs_struct *, char *, size_t);
+
         switch(ctx_priv->evaluated_syscall_id){
 
                 case SYS_creat:
@@ -460,13 +468,21 @@ enum libsandbox_result libsandbox_next_syscall(void * ctx_private, struct libsan
                 case SYS_utime:
                 case SYS_utimes:
                 case SYS_access:{
+                    path_extractor_fnc = extract_arg0pathlink;
+                }break;
 
-                    if(extract_pathlink_arg0(ctx_priv->root_process_pid, & ctx_priv->evaluated_cpu_regs, access_attempt_path, access_attempt_path_size)){
-                        return LIBSANDBOX_RESULT_ERROR;
-                    }
-
-                    return LIBSANDBOX_RESULT_ACCESS_ATTEMPT_PATH;
-
+                case SYS_openat:
+                case SYS_name_to_handle_at:
+                case SYS_mknodat:
+                case SYS_mkdirat:
+                case SYS_newfstatat:
+                case SYS_fchmodat:
+                case SYS_fchownat:
+                case SYS_futimesat:
+                case SYS_utimensat:
+                case SYS_faccessat:
+                case SYS_faccessat2:{
+                    path_extractor_fnc = extract_arg0dirfd_arg1pathlink;
                 }break;
 
             default:{
@@ -476,6 +492,17 @@ enum libsandbox_result libsandbox_next_syscall(void * ctx_private, struct libsan
             }break;
 
         }
+
+        if(path_extractor_fnc(ctx_priv->root_process_pid, & ctx_priv->evaluated_cpu_regs, access_attempt_path, access_attempt_path_size)){
+            summary->auto_blocked_syscalls += 1;
+            if(libsandbox_syscall_deny(ctx_priv)){
+                fprintf(stderr, ERR_PREFIX "unable to automatically block syscall\n");
+                return LIBSANDBOX_RESULT_ERROR;
+            }
+            continue;
+        }
+
+        return LIBSANDBOX_RESULT_ACCESS_ATTEMPT_PATH;
 
     }
 

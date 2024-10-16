@@ -13,6 +13,7 @@ enum libsandbox_result{
 
 struct libsandbox_summary{
     int return_code;
+    int auto_blocked_syscalls;
 };
 
 struct libsandbox_rules{

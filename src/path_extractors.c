@@ -11,7 +11,7 @@ static int extract_pathraw_addr(pid_t pid, char * addr, char * path, size_t path
         *(long*)chunk = ptrace(PTRACE_PEEKDATA, pid, addr, NULL);
 
         if( (*(long*)chunk == -1) && (errno != 0) ){
-            // the process has probably exited (or perhaps the address is wrong)
+            // the process has probably exited (or perhaps the address is wrong) (or perhaps there is a bug in the program that makes it try and read an invalid address)
             fprintf(stderr, ERR_PREFIX "could not read from address space of process with pid `%d`\n", pid);
             return 1;
         }
@@ -42,9 +42,25 @@ static int extract_pathraw_addr(pid_t pid, char * addr, char * path, size_t path
 
 }
 
-static int extract_pathlink_arg0(pid_t pid, struct user_regs_struct * cpu_regs, char * path, size_t path_size){
+static int extract_arg0pathlink(pid_t pid, struct user_regs_struct * cpu_regs, char * path, size_t path_size){
 
-    char * path_cstr = (char *) CPU_REG_R_SYSCALL_ARG0(*cpu_regs);
+    char * path_cstr = (char *) CPU_REG_R_SYSCALL_ARG0(* cpu_regs);
+
+    if(extract_pathraw_addr(pid, path_cstr, path, path_size)){
+        return 1;
+    }
+
+    // TODO follow the path symlink
+
+    return 0;
+}
+
+static int extract_arg0dirfd_arg1pathlink(pid_t pid, struct user_regs_struct * cpu_regs, char * path, size_t path_size){
+
+    // int dir_fd = CPU_REG_R_SYSCALL_ARG0(* cpu_regs);
+    // TODO
+
+    char * path_cstr = (char *) CPU_REG_R_SYSCALL_ARG1(* cpu_regs);
 
     if(extract_pathraw_addr(pid, path_cstr, path, path_size)){
         return 1;
