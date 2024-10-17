@@ -327,8 +327,7 @@ int libsandbox_syscall_deny(void * ctx_private){
     return 0;
 }
 
-// TODO? make it so that if this exits with LIBSANDBOX_RESULT_ERROR it kills all processes
-// perhaps do it also when finished just to be sure?
+// if the result is `LIBSANDBOX_RESULT_ERROR` none of the children are killed - this is the caller's responsibility if he so desires (however, if the caller exits they are going to die)
 enum libsandbox_result libsandbox_next_syscall(void * ctx_private, struct libsandbox_summary * summary, size_t path_size, char * path0, char * path1){
     struct ctx_private * ctx_priv = ctx_private;
 
