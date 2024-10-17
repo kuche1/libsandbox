@@ -8,11 +8,6 @@
 ////////// low level
 //////////
 
-// static int file_or_folder_exists(char * path){
-//     struct stat buffer;
-//     return (stat(path, &buffer) == 0);
-// }
-
 static int is_symlink(char * path){
 
     struct stat sb;
