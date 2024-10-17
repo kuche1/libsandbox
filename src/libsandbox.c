@@ -53,6 +53,7 @@ struct ctx_private{
 //////////
 
 #include "get_syscall_name.c" // depends on the existing namespace for the SYS_* defines
+#include "error_util.c"
 #include "string_operations.c"
 #include "path_extractors.c"
 
