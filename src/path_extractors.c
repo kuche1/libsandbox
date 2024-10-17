@@ -8,8 +8,6 @@
 ////////// low level
 //////////
 
-static int extract_pathlink(pid_t pid, char * path_raw, char * path, size_t path_size, size_t * path_actually_written_bytes);
-
 // static int file_or_folder_exists(char * path){
 //     struct stat buffer;
 //     return (stat(path, &buffer) == 0);
@@ -100,12 +98,12 @@ static ssize_t extract_pathraw_addr(pid_t pid, char * addr, char * path, size_t 
 
 }
 
-// `path_actually_written_bytes` does not include the ending \0
-static int extract_pathlink(pid_t pid, char * path_raw, char * path, size_t path_size, size_t * path_actually_written_bytes){
+// returns: (negative on error) or (number of bytes written, excluding ending \0)
+static ssize_t extract_pathlink(pid_t pid, char * path_raw, char * path, size_t path_size){
 
     if(path_size <= 0){
         fprintf(stderr, ERR_PREFIX "provided buffer size is <= 0\n");
-        return 1;
+        return -1;
     }
 
     char process_cwd[path_size];
@@ -113,13 +111,13 @@ static int extract_pathlink(pid_t pid, char * path_raw, char * path, size_t path
     ssize_t process_cwd_len = extract_cwd(pid, sizeof(process_cwd), process_cwd);
     if(process_cwd_len < 0){
         fprintf(stderr, ERR_PREFIX "could not extract cwd of process with pid `%d`\n", pid);
-        return 1;
+        return -1;
     }
 
     int process_cwd_dirfd = open(process_cwd, O_RDONLY | O_DIRECTORY);
     if(process_cwd_dirfd < 0){
         fprintf(stderr, ERR_PREFIX "could not open cwd of process with pid `%d` (location is `%s`)\n", pid, process_cwd);
-        return 1;
+        return -1;
     }
 
     ssize_t path_dereferenced_len_or_err = readlinkat(process_cwd_dirfd, path_raw, path, path_size - 1);
@@ -137,38 +135,36 @@ static int extract_pathlink(pid_t pid, char * path_raw, char * path, size_t path
                 size_t path_len = 0;
                 if(str_append_str(path, path_size, & path_len, path_raw)){
                     fprintf(stderr, ERR_PREFIX "buf too small\n");
-                    return 1;
+                    return -1;
                 }
-                * path_actually_written_bytes = path_len;
-                return 0;
+                return path_len;
             }
 
             ssize_t path_len_or_err = extract_cwd(pid, path_size, path);
 
             if(path_len_or_err < 0){
-                return 1;
+                fprintf(stderr, ERR_PREFIX "`extract_cwd` failure\n");
+                return -1;
             }
 
             size_t path_len = path_len_or_err;
 
             if(str_append_char(path, path_size, & path_len, '/')){
                 fprintf(stderr, ERR_PREFIX "buf too small\n");
-                return 1;
+                return -1;
             }
 
             if(str_append_str(path, path_size, & path_len, path_raw)){
                 fprintf(stderr, ERR_PREFIX "buf too small\n");
-                return 1;
+                return -1;
             }
 
-            * path_actually_written_bytes = path_len;
-
-            return 0;
+            return path_len;
 
         }
 
         fprintf(stderr, ERR_PREFIX "could not dereference non-ENOENT path `%s`\n", path_raw);
-        return 1;
+        return -1;
 
     }
 
@@ -178,14 +174,12 @@ static int extract_pathlink(pid_t pid, char * path_raw, char * path, size_t path
         // it might be the case that we have just enough memory, but we can't differentiate
         // wetween having just enough memory and not having enough, so we'll assume the worst
         fprintf(stderr, ERR_PREFIX "not enough memory to dereference path `%s`\n", path_raw);
-        return 1;
+        return -1;
     }
 
     path[path_dereferenced_len] = 0;
 
-    * path_actually_written_bytes = path_dereferenced_len;
-
-    return 0;
+    return path_dereferenced_len;
 
 }
 
@@ -198,13 +192,7 @@ static ssize_t extract_pathlink_pidmemstr(pid_t pid, char * pidmem_str, char * p
         return -1;
     }
 
-    size_t path_actually_written_bytes; // TODO look for this `path_actually_written_bytes` everywhere in the code and get rid of it
-    if(extract_pathlink(pid, path_raw, path, path_size, & path_actually_written_bytes)){
-        return -1;
-    }
-
-    return path_actually_written_bytes;
-
+    return extract_pathlink(pid, path_raw, path, path_size);
 }
 
 // returns (negative on error) or (number of bytes written, excluding ending \0)
@@ -232,11 +220,7 @@ static ssize_t extract_pathlink_pidmemdirfd(pid_t pid, int pidmem_dirfd, char * 
 
     if(pidmem_dirfd == AT_FDCWD){
 
-        size_t path_actually_written_bytes;
-        if(extract_pathlink(pid, file_containing_dirfd, path, path_size, & path_actually_written_bytes)){
-            return -1;
-        }
-        return path_actually_written_bytes;
+        return extract_pathlink(pid, file_containing_dirfd, path, path_size);
 
     }else{
 
