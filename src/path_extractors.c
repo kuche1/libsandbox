@@ -198,15 +198,19 @@ static ssize_t extract_pathlink_pidmemstr(pid_t pid, char * pidmem_str, char * p
 // returns (negative on error) or (number of bytes written, excluding ending \0)
 static ssize_t extract_pathlink_pidmemdirfd(pid_t pid, int pidmem_dirfd, char * path, size_t path_size){
 
+    if(pidmem_dirfd == AT_FDCWD){
+        return extract_cwd(pid, path_size, path);
+    }
+
+    printf("DBG: YEEEEE");
+    // TODO this print is here since this branch has been
+    // totally untested
+
     char file_containing_dirfd[100];
 
     int written;
 
-    if(pidmem_dirfd == AT_FDCWD){
-        written = snprintf(file_containing_dirfd, sizeof(file_containing_dirfd), "/proc/%d/cwd", pid);
-    }else{
-        written = snprintf(file_containing_dirfd, sizeof(file_containing_dirfd), "/proc/%d/fd/%d", pid, pidmem_dirfd);
-    }
+    written = snprintf(file_containing_dirfd, sizeof(file_containing_dirfd), "/proc/%d/fd/%d", pid, pidmem_dirfd);
 
     if(written < 0){
         fprintf(stderr, ERR_PREFIX "`snprintf` failure\n");
@@ -218,65 +222,53 @@ static ssize_t extract_pathlink_pidmemdirfd(pid_t pid, int pidmem_dirfd, char * 
         return -1;
     }
 
-    if(pidmem_dirfd == AT_FDCWD){
-
-        return extract_pathlink(pid, file_containing_dirfd, path, path_size);
-
-    }else{
-
-        printf("DBG: YEEEEE");
-        // TODO this print is here since this branch has been
-        // totally untested
-
-        FILE * f = fopen(file_containing_dirfd, "rb");
-        if(!f){
-            fprintf(stderr, ERR_PREFIX "could not open file containing dirfd `%s`\n", file_containing_dirfd);
-            return -1;
-        }
-
-        if(fseek(f, 0, SEEK_END)){
-            fprintf(stderr, ERR_PREFIX "`fseek` failure\n");
-            fclose(f);
-            return -1;
-        }
-
-        long actual_path_size = ftell(f);
-
-        if(actual_path_size < 0){
-            fprintf(stderr, ERR_PREFIX "`ftell` failure\n");
-            fclose(f);
-            return -1;
-        }
-
-        rewind(f);
-
-        if(path_size <= 0){
-            fprintf(stderr, ERR_PREFIX "provided buffer size is <= 0\n");
-            fclose(f);
-            return -1;
-        }
-
-        if((size_t) actual_path_size > path_size - 1){
-            fprintf(stderr, ERR_PREFIX "not enough memory for the actual path\n");
-            fclose(f);
-            return -1;
-        }
-
-        size_t read = fread(path, 1, path_size - 1, f);
-
-        if(read != (size_t) actual_path_size){
-            fprintf(stderr, ERR_PREFIX "`fread` failure\n");
-            fclose(f);
-            return -1;
-        }
-
-        fclose(f);
-
-        path[read] = 0;
-
-        return read;
-
+    FILE * f = fopen(file_containing_dirfd, "rb");
+    if(!f){
+        fprintf(stderr, ERR_PREFIX "could not open file containing dirfd `%s`\n", file_containing_dirfd);
+        return -1;
     }
+
+    if(fseek(f, 0, SEEK_END)){
+        fprintf(stderr, ERR_PREFIX "`fseek` failure\n");
+        fclose(f);
+        return -1;
+    }
+
+    long actual_path_size = ftell(f);
+
+    if(actual_path_size < 0){
+        fprintf(stderr, ERR_PREFIX "`ftell` failure\n");
+        fclose(f);
+        return -1;
+    }
+
+    rewind(f);
+
+    if(path_size <= 0){
+        fprintf(stderr, ERR_PREFIX "provided buffer size is <= 0\n");
+        fclose(f);
+        return -1;
+    }
+
+    if((size_t) actual_path_size > path_size - 1){
+        fprintf(stderr, ERR_PREFIX "not enough memory for the actual path\n");
+        fclose(f);
+        return -1;
+    }
+
+    size_t read = fread(path, 1, path_size - 1, f);
+
+    if(read != (size_t) actual_path_size){
+        fprintf(stderr, ERR_PREFIX "`fread` failure\n");
+        fclose(f);
+        return -1;
+    }
+
+    fclose(f);
+
+    path[read] = 0;
+
+    return read;
 
 }
 
