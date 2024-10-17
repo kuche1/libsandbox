@@ -13,6 +13,18 @@
 //     return (stat(path, &buffer) == 0);
 // }
 
+static int is_symlink(char * path){
+
+    struct stat sb;
+
+    if(lstat(path, & sb) == -1){
+        fprintf(stderr, ERR_PREFIX "`lstat` failure for `%s`\n", path);
+        return 0;
+    };
+
+    return (sb.st_mode & S_IFMT) == S_IFLNK;
+}
+
 // return: (negative on err) or (number of bytes written excluding \0)
 static ssize_t extract_cwd(pid_t pid, size_t path_size, char * path){
 
@@ -101,71 +113,66 @@ static ssize_t extract_pathraw_addr(pid_t pid, char * addr, char * path, size_t 
 // returns: (negative on error) or (number of bytes written, excluding ending \0)
 static ssize_t extract_pathlink(pid_t pid, char * path_raw, char * path, size_t path_size){
 
+    char full_path[path_size];
+    size_t full_path_len = 0;
+
+    if(path_raw[0] == '/'){
+
+        // it's a full path, forget about cwd
+
+        if(str_append_str(full_path, sizeof(full_path), & full_path_len, path_raw)){
+            fprintf(stderr, ERR_PREFIX "`str_append_str` failure\n");
+            return -1;
+        }
+
+    }else{
+
+        ssize_t full_path_len_or_err = extract_cwd(pid, sizeof(full_path), full_path);
+        if(full_path_len_or_err < 0){
+            fprintf(stderr, ERR_PREFIX "could not extract cwd of process with pid `%d`\n", pid);
+            return -1;
+        }
+
+        full_path_len = full_path_len_or_err;
+
+        if(str_append_char(full_path, sizeof(full_path), & full_path_len, '/')){
+            fprintf(stderr, ERR_PREFIX "`str_append_str` failure\n");
+            return -1;
+        }
+
+        if(str_append_str(full_path, sizeof(full_path), & full_path_len, path_raw)){
+            fprintf(stderr, ERR_PREFIX "`str_append_str` failure\n");
+            return -1;
+        }
+
+    }
+
+    if(!is_symlink(full_path)){
+
+        size_t len = 0;
+
+        if(str_append_str(path, path_size, & len, full_path)){
+            fprintf(stderr, ERR_PREFIX "`str_append_str` failure\n");
+            return -1;
+        }
+
+        return len;
+
+    }
+
+    // must be a symlink
+
     if(path_size <= 0){
         fprintf(stderr, ERR_PREFIX "provided buffer size is <= 0\n");
         return -1;
     }
 
-    char process_cwd[path_size];
-
-    ssize_t process_cwd_len = extract_cwd(pid, sizeof(process_cwd), process_cwd);
-    if(process_cwd_len < 0){
-        fprintf(stderr, ERR_PREFIX "could not extract cwd of process with pid `%d`\n", pid);
-        return -1;
-    }
-
-    int process_cwd_dirfd = open(process_cwd, O_RDONLY | O_DIRECTORY);
-    if(process_cwd_dirfd < 0){
-        fprintf(stderr, ERR_PREFIX "could not open cwd of process with pid `%d` (location is `%s`)\n", pid, process_cwd);
-        return -1;
-    }
-
-    ssize_t path_dereferenced_len_or_err = readlinkat(process_cwd_dirfd, path_raw, path, path_size - 1);
+    ssize_t path_dereferenced_len_or_err = readlink(full_path, path, path_size - 1);
     int path_dereferenced_len_or_err_errno = errno;
 
-    close(process_cwd_dirfd);
-
     if(path_dereferenced_len_or_err < 0){
-
-        if(path_dereferenced_len_or_err_errno == ENOENT){
-            // we're trying to dereference a non-existant file/folder, no wonder it's failing
-
-            if(path_raw[0] == '/'){ // null-terminated, so nothing dangerous
-                // full path
-                size_t path_len = 0;
-                if(str_append_str(path, path_size, & path_len, path_raw)){
-                    fprintf(stderr, ERR_PREFIX "buf too small\n");
-                    return -1;
-                }
-                return path_len;
-            }
-
-            ssize_t path_len_or_err = extract_cwd(pid, path_size, path);
-
-            if(path_len_or_err < 0){
-                fprintf(stderr, ERR_PREFIX "`extract_cwd` failure\n");
-                return -1;
-            }
-
-            size_t path_len = path_len_or_err;
-
-            if(str_append_char(path, path_size, & path_len, '/')){
-                fprintf(stderr, ERR_PREFIX "buf too small\n");
-                return -1;
-            }
-
-            if(str_append_str(path, path_size, & path_len, path_raw)){
-                fprintf(stderr, ERR_PREFIX "buf too small\n");
-                return -1;
-            }
-
-            return path_len;
-
-        }
-
-        fprintf(stderr, ERR_PREFIX "could not dereference non-ENOENT path `%s` (errno=%d `%s`)\n", path_raw, path_dereferenced_len_or_err_errno, strerror(path_dereferenced_len_or_err_errno));
+        fprintf(stderr, ERR_PREFIX "could not dereference path `%s` (full=`%s`) (errno=%d `%s`)\n", path_raw, full_path, path_dereferenced_len_or_err_errno, strerror(path_dereferenced_len_or_err_errno));
         return -1;
-
     }
 
     size_t path_dereferenced_len = path_dereferenced_len_or_err;
