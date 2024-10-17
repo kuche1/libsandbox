@@ -44,7 +44,7 @@ int main(void){
 
     struct libsandbox_rules rules;
     libsandbox_rules_init(& rules, 0); // `1` stands for permissive, `0` for non-permissive
-    rules.filesystem_allow_metadata = 1;
+    // rules.filesystem_allow_metadata = 1;
 
     size_t ctx_private_size = libsandbox_get_ctx_private_size();
     char ctx_private[ctx_private_size];

@@ -163,7 +163,7 @@ static ssize_t extract_pathlink(pid_t pid, char * path_raw, char * path, size_t 
 
         }
 
-        fprintf(stderr, ERR_PREFIX "could not dereference non-ENOENT path `%s`\n", path_raw);
+        fprintf(stderr, ERR_PREFIX "could not dereference non-ENOENT path `%s` (errno=%d `%s`)\n", path_raw, path_dereferenced_len_or_err_errno, strerror(path_dereferenced_len_or_err_errno));
         return -1;
 
     }
@@ -189,10 +189,16 @@ static ssize_t extract_pathlink_pidmemstr(pid_t pid, char * pidmem_str, char * p
     char path_raw[path_size];
 
     if(extract_pathraw_addr(pid, pidmem_str, path_raw, sizeof(path_raw)) < 0){
+        fprintf(stderr, ERR_PREFIX "call to `extract_pathraw_addr` failed\n");
         return -1;
     }
 
-    return extract_pathlink(pid, path_raw, path, path_size);
+    ssize_t ret = extract_pathlink(pid, path_raw, path, path_size);
+    if(ret < 0){
+        fprintf(stderr, ERR_PREFIX "call to `extract_pathlink` failed\n");
+    }
+
+    return ret;
 }
 
 // returns (negative on error) or (number of bytes written, excluding ending \0)
@@ -337,7 +343,8 @@ static int extract_arg0pathlink(pid_t pid, struct user_regs_struct * cpu_regs, s
 
     char * pidmem_str = (char *) CPU_REG_R_SYSCALL_ARG0(* cpu_regs);
 
-    if(extract_pathlink_pidmemstr(pid, pidmem_str, path0, path_size)){
+    if(extract_pathlink_pidmemstr(pid, pidmem_str, path0, path_size) < 0){
+        fprintf(stderr, ERR_PREFIX "call to `extract_pathlink_pidmemstr` failed\n");
         return -1;
     }
 

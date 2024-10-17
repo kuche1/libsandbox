@@ -303,11 +303,15 @@ int libsandbox_syscall_allow(void * ctx_private){
     return 0;
 }
 
-int libsandbox_syscall_deny(void * ctx_private){
+static int libsandbox_syscall_deny_inner(void * ctx_private, int automatically_blocked){
     struct ctx_private * ctx_priv = ctx_private;
 
     const char * name = get_syscall_name(ctx_priv->evaluated_syscall_id);
-    printf(PRINT_PREFIX "blocking syscall with id `%ld` (%s)\n", ctx_priv->evaluated_syscall_id, name);
+
+    if(automatically_blocked){
+        printf(PRINT_PREFIX "automatically ");
+    }
+    printf("blocking syscall with id `%ld` (%s)\n", ctx_priv->evaluated_syscall_id, name);
 
     CPU_REG_RW_SYSCALL_ID (ctx_priv->evaluated_cpu_regs) = -1; // invalidate the syscall by changing the ID
     CPU_REG_RW_SYSCALL_RET(ctx_priv->evaluated_cpu_regs) = -1; // also put bad return code, suprisingly this fixes some programs (example: python3)
@@ -325,6 +329,10 @@ int libsandbox_syscall_deny(void * ctx_private){
     }
 
     return 0;
+}
+
+int libsandbox_syscall_deny(void * ctx_private){
+    return libsandbox_syscall_deny_inner(ctx_private, 0);
 }
 
 // if the result is `LIBSANDBOX_RESULT_ERROR` none of the children are killed - this is the caller's responsibility if he so desires (however, if the caller exits they are going to die)
@@ -525,7 +533,7 @@ enum libsandbox_result libsandbox_next_syscall(void * ctx_private, struct libsan
         if(buffers_used < 0){
 
             summary->auto_blocked_syscalls += 1;
-            if(libsandbox_syscall_deny(ctx_priv)){
+            if(libsandbox_syscall_deny_inner(ctx_priv, 1)){
                 fprintf(stderr, ERR_PREFIX "unable to automatically block syscall\n");
                 return LIBSANDBOX_RESULT_ERROR;
             }
