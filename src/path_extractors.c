@@ -1,8 +1,8 @@
 
-// TODO ideally we would only dereference a symlink if the given syscall does so as well
+// TOD0 ideally we would only dereference a symlink if the given syscall does so as well
 
-// `pathraw` means a path as it is (it might be a symlink)
-// `pathlink` means a dereferenced path (it's not a symlink)
+// `pathraw` - treat a path as it is (do not try to dereference)
+// `pathlink` - try to dereference, and if it doesn't work (eg you can't dererefence a non-existant symlink) trat as it is
 
 //////////
 ////////// low level
