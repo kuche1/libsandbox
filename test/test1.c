@@ -56,7 +56,8 @@ int main(void){
 
     printf("forked successfully\n");
 
-    struct libsandbox_summary summary = {0}; // TODO the user should not be responsible for this
+    struct libsandbox_summary summary;
+    libsandbox_summary_init(&summary);
 
     size_t path_size = 400;
     char path0[path_size];

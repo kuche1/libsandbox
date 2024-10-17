@@ -166,6 +166,38 @@ static inline int set_seccomp_rules(struct libsandbox_rules * rules){
         SECCOMP_RULE_ADD(ctx, action_metadata, SCMP_SYS(faccessat2), 0);
 
         // extended file attributes // TODO
+
+        // file descriptor manipulations // TODO
+
+        // read/write
+
+        // read // depends on `open`
+        // readv // depends on `open`
+        // pread // depends on `open`
+        // preadv // depends on `open`
+        // write // depends on `open`
+        // writev // depends on `open`
+        // pwrite // depends on `open`
+        // pwritev // depends on `open`
+        // lseek // depends on `open`
+        // sendfile // depends on `open` and `socket`
+
+        // synchronised I/O
+
+        // fdatasync // harmless
+        // fsync // harmless
+        // msync // harmless
+        // sync_file_rage // harmless
+        // sync // harmless
+        // sync_fs // harmless
+
+        // asynchronous I/O TODO
+
+        // multiplexed I/O TODO
+
+        // monitoring file events TODO
+
+        // miscellaneous TODO
     }
 
     // set rules: networking
@@ -193,6 +225,11 @@ static inline int set_seccomp_rules(struct libsandbox_rules * rules){
 //////////
 ////////// functions: public
 //////////
+
+void libsandbox_summary_init(struct libsandbox_summary * summary){
+    summary->return_code = -1;
+    summary->auto_blocked_syscalls = 0;
+}
 
 void libsandbox_rules_init(struct libsandbox_rules * rules, int permissive){
     rules->filesystem_allow_all = permissive;

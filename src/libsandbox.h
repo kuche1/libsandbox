@@ -23,6 +23,8 @@ struct libsandbox_rules{
     int networking_allow_all;
 };
 
+void libsandbox_summary_init(struct libsandbox_summary * summary);
+
 void libsandbox_rules_init(struct libsandbox_rules * rules, int permissive);
 
 size_t libsandbox_get_ctx_private_size(void);
