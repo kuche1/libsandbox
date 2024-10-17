@@ -58,13 +58,13 @@ int main(void){
 
     struct libsandbox_summary summary = {0}; // TODO the user should not be responsible for this
 
-    size_t size_path = 400;
-    char path0[size_path];
-    char path1[size_path];
+    size_t path_size = 400;
+    char path0[path_size];
+    char path1[path_size];
 
     for(int running = 1; running;){
 
-        switch(libsandbox_next_syscall(ctx_private, & summary, size_path, path0, path1)){
+        switch(libsandbox_next_syscall(ctx_private, & summary, path_size, path0, path1)){
 
             case LIBSANDBOX_RESULT_FINISHED:{
                 running = 0;
