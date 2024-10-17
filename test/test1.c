@@ -77,12 +77,18 @@ int main(void){
 
             case LIBSANDBOX_RESULT_ACCESS_ATTEMPT_PATH0:{
                 printf("attempt to access path `%s`\n", path0);
-                libsandbox_syscall_allow(ctx_private);
+                if(libsandbox_syscall_allow(ctx_private)){
+                    printf("something went wrong\n");
+                    return 1;
+                }
             }break;
 
             case LIBSANDBOX_RESULT_ACCESS_ATTEMPT_PATH0_PATH1:{
                 printf("attempt to access paths `%s` and `%s`\n", path0, path1);
-                libsandbox_syscall_allow(ctx_private);
+                if(libsandbox_syscall_allow(ctx_private)){
+                    printf("something went wrong\n");
+                    return 1;
+                }
             }break;
 
         }
