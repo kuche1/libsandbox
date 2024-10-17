@@ -53,7 +53,6 @@ struct ctx_private{
 //////////
 
 #include "get_syscall_name.c" // depends on the existing namespace for the SYS_* defines
-#include "error_util.c"
 #include "string_operations.c"
 #include "path_extractors.c"
 
@@ -499,11 +498,11 @@ enum libsandbox_result libsandbox_next_syscall(void * ctx_private, struct libsan
                     path_extractor_fnc = extract_arg0pathlinkA_arg1dirfdB_arg2pathlinkB;
                 }break;
 
-                // case SYS_renameat:
-                // case SYS_renameat2:
-                // case SYS_linkat:{
-                //     path_extractor_fnc = extract_arg0dirfdA_arg1pathlinkA_arg2 TODO
-                // }break;
+                case SYS_renameat:
+                case SYS_renameat2:
+                case SYS_linkat:{
+                    path_extractor_fnc = extract_arg0dirfdA_arg1pathlinkA_arg2dirfdB_arg3pathlinkB;
+                }break;
 
                 // TODO there are more syscalls mising here
 

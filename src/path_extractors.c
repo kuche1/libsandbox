@@ -295,7 +295,6 @@ static inline int extract_pidmemdirfd_pathlink(pid_t pid, int pidmem_dirfd, char
         return -1;
     }
 
-    // TODO we now have a string operations library, so use that instead AND for the `strcpy` at the bottom
     if(filename[0] == '/'){ // we CAN check [0] - worst case scenario it's \0
         // it's a full path
         strcpy(path, filename);
@@ -341,6 +340,7 @@ static inline int extract_pidmemdirfd_pathlink(pid_t pid, int pidmem_dirfd, char
 
 // all these functions return (negative on error) or (the number of paths extracted)
 
+// TODO untested
 static int extract_arg0pathlink(pid_t pid, struct user_regs_struct * cpu_regs, size_t path_size, char * path0, __attribute__((unused)) char * path1){
 
     char * pidmem_str = (char *) CPU_REG_R_SYSCALL_ARG0(* cpu_regs);
@@ -406,6 +406,33 @@ static int extract_arg0pathlinkA_arg1dirfdB_arg2pathlinkB(pid_t pid, struct user
     char tmp[path_size];
 
     if(extract_pidmemdirfd_pathlink(pid, pidmem_dirfd1, pidmem_str2, path_size, path1, tmp)){
+        return -1;
+    }
+
+    return 2;
+
+}
+
+// TODO untested
+static int extract_arg0dirfdA_arg1pathlinkA_arg2dirfdB_arg3pathlinkB(pid_t pid, struct user_regs_struct * cpu_regs, size_t path_size, char * path0, char * path1){
+
+    char tmp[path_size];
+
+    // extract path0
+
+    int pidmem_dirfd0 = CPU_REG_R_SYSCALL_ARG0(* cpu_regs);
+    char * pidmem_str0 = (char *) CPU_REG_R_SYSCALL_ARG1(* cpu_regs);
+
+    if(extract_pidmemdirfd_pathlink(pid, pidmem_dirfd0, pidmem_str0, path_size, path0, tmp)){
+        return -1;
+    }
+
+    // extract path1
+
+    int pidmem_dirfd1 = CPU_REG_R_SYSCALL_ARG2(* cpu_regs);
+    char * pidmem_str1 = (char *) CPU_REG_R_SYSCALL_ARG3(* cpu_regs);
+
+    if(extract_pidmemdirfd_pathlink(pid, pidmem_dirfd1, pidmem_str1, path_size, path1, tmp)){
         return -1;
     }
 
