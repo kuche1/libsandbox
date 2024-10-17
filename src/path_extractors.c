@@ -1,5 +1,8 @@
 
 // TOD0 ideally we would only dereference a symlink if the given syscall does so as well
+// alternatively, this can probably be fixed by (ab) using the path0 path1 return thingy (althoit would probably have
+// to be expanded in the case of a symlink pointing to a symlink pointing to ...) (altho this method could lead to false
+// positives (imagine you are working on a symlink that points outside of your allowed directory))
 
 // `pathraw` - treat a path as it is (do not try to dereference)
 // `pathlink` - try to dereference, and if it doesn't work (eg you can't dererefence a non-existant symlink) trat as it is
