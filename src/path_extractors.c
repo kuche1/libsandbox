@@ -18,7 +18,11 @@ static int is_symlink(char * path){
     struct stat sb;
 
     if(lstat(path, & sb) == -1){
-        fprintf(stderr, ERR_PREFIX "`lstat` failure for `%s`\n", path);
+        if(errno == ENOENT){
+            // No such file or directory
+        }else{
+            fprintf(stderr, ERR_PREFIX "`lstat` failure for `%s` (errno=%d `%s`)\n", path, errno, strerror(errno));
+        }
         return 0;
     };
 
