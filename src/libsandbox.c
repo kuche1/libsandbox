@@ -451,6 +451,8 @@ enum libsandbox_result libsandbox_next_syscall(void * ctx_private, struct libsan
 
         switch(ctx_priv->evaluated_syscall_id){
 
+                // filesystem
+
                 case SYS_creat:
                 case SYS_open:
                 case SYS_mknod:
@@ -504,7 +506,8 @@ enum libsandbox_result libsandbox_next_syscall(void * ctx_private, struct libsan
                     path_extractor_fnc = extract_arg0dirfdA_arg1pathlinkA_arg2dirfdB_arg3pathlinkB;
                 }break;
 
-                // TODO there are more syscalls mising here
+                // networking
+                // TODO
 
             default:{
                 const char * name = get_syscall_name(ctx_priv->evaluated_syscall_id);
