@@ -509,6 +509,10 @@ enum libsandbox_result libsandbox_next_syscall(void * ctx_private, struct libsan
                 // networking
                 // TODO
 
+                // case SYS_socket:
+                // case SYS_socketpair:{
+                // }break;
+
             default:{
                 const char * name = get_syscall_name(ctx_priv->evaluated_syscall_id);
                 fprintf(stderr, ERR_PREFIX "unknown syscal with id `%ld` (%s); this is a bug that needs to be reported\n", ctx_priv->evaluated_syscall_id, name);
@@ -517,9 +521,9 @@ enum libsandbox_result libsandbox_next_syscall(void * ctx_private, struct libsan
 
         }
 
-        int bufferes_used = path_extractor_fnc(ctx_priv->root_process_pid, & ctx_priv->evaluated_cpu_regs, path_size, path0, path1);
+        int buffers_used = path_extractor_fnc(ctx_priv->root_process_pid, & ctx_priv->evaluated_cpu_regs, path_size, path0, path1);
 
-        if(bufferes_used < 0){
+        if(buffers_used < 0){
 
             summary->auto_blocked_syscalls += 1;
             if(libsandbox_syscall_deny(ctx_priv)){
@@ -528,17 +532,17 @@ enum libsandbox_result libsandbox_next_syscall(void * ctx_private, struct libsan
             }
             continue;
 
-        }else if(bufferes_used == 1){
+        }else if(buffers_used == 1){
 
             return LIBSANDBOX_RESULT_ACCESS_ATTEMPT_PATH0;
 
-        }else if(bufferes_used == 2){
+        }else if(buffers_used == 2){
 
             return LIBSANDBOX_RESULT_ACCESS_ATTEMPT_PATH0_PATH1;
 
         }
 
-        fprintf(stderr, ERR_PREFIX "unknown return value of `path_extractor_fnc` (%d); this is a bug that needs to be reported\n", bufferes_used);
+        fprintf(stderr, ERR_PREFIX "unknown return value of `path_extractor_fnc` (%d); this is a bug that needs to be reported\n", buffers_used);
         return LIBSANDBOX_RESULT_ERROR;
 
     }
