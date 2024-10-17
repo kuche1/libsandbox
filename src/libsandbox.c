@@ -13,6 +13,7 @@
 #include <sys/syscall.h> // SYS_*
 #include <fcntl.h> // AT_FDCWD
 #include <sys/stat.h> // stat
+#include <sys/socket.h> // AF_LOCAL
 
 #define PRINT_PREFIX LIBSANDBOX_PRINT_PREFIX
 #define ERR_PREFIX PRINT_PREFIX "ERROR: "
@@ -551,11 +552,54 @@ enum libsandbox_result libsandbox_next_syscall(void * ctx_private, struct libsan
                 }break;
 
                 // networking
-                // TODO
 
-                // case SYS_socket:
-                // case SYS_socketpair:{
-                // }break;
+                case SYS_socket:
+                case SYS_socketpair:{
+
+                    // TODO this code block should not be here
+
+                    // https://man7.org/linux/man-pages/man2/socket.2.html
+
+                    int domain = CPU_REG_R_SYSCALL_ARG0(ctx_priv->evaluated_cpu_regs);
+
+                    switch(domain){
+
+                        case AF_LOCAL: // same as AF_UNIX
+                        case AF_BRIDGE:
+                        case AF_NETLINK:{
+
+                            if(libsandbox_syscall_allow(ctx_priv)){
+                                fprintf(stderr, ERR_PREFIX "unable to automatically allow syscall\n");
+                                return LIBSANDBOX_RESULT_ERROR;
+                            }
+                            continue;
+
+                        }break;
+
+                        case AF_INET:
+                        case AF_INET6:
+                        case AF_DECnet:
+                        case AF_ROSE:{
+
+                            summary->auto_blocked_syscalls += 1;
+                            if(libsandbox_syscall_deny_inner(ctx_priv, 1)){
+                                fprintf(stderr, ERR_PREFIX "unable to automatically block syscall\n");
+                                return LIBSANDBOX_RESULT_ERROR;
+                            }
+                            continue;
+
+                        }break;
+
+                        default:{
+
+                            fprintf(stderr, ERR_PREFIX "unknown domain (%d)\n", domain);
+                            return LIBSANDBOX_RESULT_ERROR;
+
+                        }break;
+
+                    }
+
+                }break;
 
             default:{
                 const char * name = get_syscall_name(ctx_priv->evaluated_syscall_id);
