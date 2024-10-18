@@ -69,7 +69,7 @@ static ssize_t extract_cwd(pid_t pid, size_t path_size, char * path){
 // returns how much bytes have been written (excluding the last \0), or negative if error
 static ssize_t extract_pathraw_addr(pid_t pid, char * addr, char * path, size_t path_size){
 
-    ssize_t bytes_read = 0;
+    size_t bytes_read = 0;
 
     for(;;){
 
@@ -181,7 +181,7 @@ static ssize_t extract_pathlink(pid_t pid, char * path_raw, char * path, size_t 
 
     if(path_dereferenced_len == path_size - 1){
         // it might be the case that we have just enough memory, but we can't differentiate
-        // wetween having just enough memory and not having enough, so we'll assume the worst
+        // between having just enough memory and not having enough, so we'll assume the worst
         fprintf(stderr, ERR_PREFIX "not enough memory to dereference path `%s`\n", path_raw);
         return -1;
     }

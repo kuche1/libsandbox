@@ -28,8 +28,6 @@ struct libsandbox_rules{
     int networking_allow_all;
 };
 
-void libsandbox_summary_init(struct libsandbox_summary * summary);
-
 void libsandbox_rules_init(struct libsandbox_rules * rules, enum libsandbox_rule_default default_permissiveness);
 
 size_t libsandbox_get_ctx_private_size(void);
@@ -38,9 +36,11 @@ int libsandbox_fork(char * * command_argv, struct libsandbox_rules * rules, void
 // `command_argv` needs to be null-terminated
 // `ctx_private` needs to be a pointer to memory of size `libsandbox_get_ctx_private_size()`
 
-int libsandbox_syscall_allow(void * ctx_private);
-int libsandbox_syscall_deny(void * ctx_private);
-// called after `libsandbox_next_syscall` to signify access
+void libsandbox_summary_init(struct libsandbox_summary * summary);
 
 enum libsandbox_result libsandbox_next_syscall(void * ctx_private, struct libsandbox_summary * summary, size_t path_size, char * path0, char * path1);
 // `path0` and `path1` need to be buffers of size `path_size` each
+
+int libsandbox_syscall_allow(void * ctx_private);
+int libsandbox_syscall_deny(void * ctx_private);
+// called after `libsandbox_next_syscall` to signify access

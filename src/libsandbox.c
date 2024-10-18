@@ -64,14 +64,37 @@ static inline void sigkill_or_print_err(pid_t pid){
     }
 }
 
+static int libsandbox_syscall_deny_inner(void * ctx_private, int automatically_blocked){
+    struct ctx_private * ctx_priv = ctx_private;
+
+    const char * name = get_syscall_name(ctx_priv->evaluated_syscall_id);
+
+    if(automatically_blocked){
+        printf(PRINT_PREFIX "automatically ");
+    }
+    printf("blocking syscall with id `%ld` (%s)\n", ctx_priv->evaluated_syscall_id, name);
+
+    CPU_REG_RW_SYSCALL_ID (ctx_priv->evaluated_cpu_regs) = -1; // invalidate the syscall by changing the ID
+    CPU_REG_RW_SYSCALL_RET(ctx_priv->evaluated_cpu_regs) = -1; // also put bad return code, suprisingly this fixes some programs (example: python3)
+
+    // there is might be a way to only set the syscall id reg, and not all of them
+    // but it might not necessarily be portable
+    if(ptrace(PTRACE_SETREGS, ctx_priv->evaluated_subprocess_pid, NULL, & ctx_priv->evaluated_cpu_regs)){
+        printf(ERR_PREFIX "could not PTRACE_SETREGS\n");
+        return 1;
+    }
+
+    if(ptrace(PTRACE_CONT, ctx_priv->evaluated_subprocess_pid, NULL, NULL)){
+        fprintf(stderr, ERR_PREFIX "could not PTRACE_CONT\n");
+        return 1;
+    }
+
+    return 0;
+}
+
 //////////
 ////////// functions: public
 //////////
-
-void libsandbox_summary_init(struct libsandbox_summary * summary){
-    summary->return_code = -1;
-    summary->auto_blocked_syscalls = 0;
-}
 
 void libsandbox_rules_init(struct libsandbox_rules * rules, enum libsandbox_rule_default default_permissiveness){
     rules->filesystem_allow_all = default_permissiveness;
@@ -171,47 +194,9 @@ int libsandbox_fork(char * * command_argv, struct libsandbox_rules * rules, void
 
 }
 
-int libsandbox_syscall_allow(void * ctx_private){
-    struct ctx_private * ctx_priv = ctx_private;
-
-    if(ptrace(PTRACE_CONT, ctx_priv->evaluated_subprocess_pid, NULL, NULL)){
-        fprintf(stderr, ERR_PREFIX "could not PTRACE_CONT\n");
-        return 1;
-    }
-
-    return 0;
-}
-
-static int libsandbox_syscall_deny_inner(void * ctx_private, int automatically_blocked){
-    struct ctx_private * ctx_priv = ctx_private;
-
-    const char * name = get_syscall_name(ctx_priv->evaluated_syscall_id);
-
-    if(automatically_blocked){
-        printf(PRINT_PREFIX "automatically ");
-    }
-    printf("blocking syscall with id `%ld` (%s)\n", ctx_priv->evaluated_syscall_id, name);
-
-    CPU_REG_RW_SYSCALL_ID (ctx_priv->evaluated_cpu_regs) = -1; // invalidate the syscall by changing the ID
-    CPU_REG_RW_SYSCALL_RET(ctx_priv->evaluated_cpu_regs) = -1; // also put bad return code, suprisingly this fixes some programs (example: python3)
-
-    // there is might be a way to only set the syscall id reg, and not all of them
-    // but it might not necessarily be portable
-    if(ptrace(PTRACE_SETREGS, ctx_priv->evaluated_subprocess_pid, NULL, & ctx_priv->evaluated_cpu_regs)){
-        printf(ERR_PREFIX "could not PTRACE_SETREGS\n");
-        return 1;
-    }
-
-    if(ptrace(PTRACE_CONT, ctx_priv->evaluated_subprocess_pid, NULL, NULL)){
-        fprintf(stderr, ERR_PREFIX "could not PTRACE_CONT\n");
-        return 1;
-    }
-
-    return 0;
-}
-
-int libsandbox_syscall_deny(void * ctx_private){
-    return libsandbox_syscall_deny_inner(ctx_private, 0);
+void libsandbox_summary_init(struct libsandbox_summary * summary){
+    summary->return_code = -1;
+    summary->auto_blocked_syscalls = 0;
 }
 
 // if the result is `LIBSANDBOX_RESULT_ERROR` none of the children are killed - this is the caller's responsibility if he so desires (however, if the caller exits they are going to die)
@@ -476,4 +461,19 @@ enum libsandbox_result libsandbox_next_syscall(void * ctx_private, struct libsan
 
     }
 
+}
+
+int libsandbox_syscall_allow(void * ctx_private){
+    struct ctx_private * ctx_priv = ctx_private;
+
+    if(ptrace(PTRACE_CONT, ctx_priv->evaluated_subprocess_pid, NULL, NULL)){
+        fprintf(stderr, ERR_PREFIX "could not PTRACE_CONT\n");
+        return 1;
+    }
+
+    return 0;
+}
+
+int libsandbox_syscall_deny(void * ctx_private){
+    return libsandbox_syscall_deny_inner(ctx_private, 0);
 }
