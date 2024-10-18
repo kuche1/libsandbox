@@ -15,6 +15,10 @@
 #include <sys/stat.h> // stat
 #include <sys/socket.h> // AF_LOCAL
 
+//////////
+////////// defines/macros
+//////////
+
 #define PRINT_PREFIX LIBSANDBOX_PRINT_PREFIX
 #define ERR_PREFIX PRINT_PREFIX "ERROR: "
 
@@ -38,6 +42,10 @@
         return 1; \
     } \
 }
+
+//////////
+////////// structures
+//////////
 
 struct ctx_private{
     pid_t root_process_pid;
