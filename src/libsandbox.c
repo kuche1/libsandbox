@@ -272,7 +272,15 @@ void libsandbox_summary_init(struct libsandbox_summary * summary){
 }
 
 // if the result is `LIBSANDBOX_RESULT_ERROR` none of the children are killed - this is the caller's responsibility if he so desires (however, if the caller exits they are going to die)
-enum libsandbox_result libsandbox_next_syscall(void * ctx_private, struct libsandbox_summary * summary, size_t path_size, char * path0, char * path1){
+enum libsandbox_result libsandbox_next_syscall(
+    void * ctx_private,
+    struct libsandbox_summary * summary,
+    size_t path_size,
+    char * path0,
+    size_t * path0_len,
+    char * path1,
+    size_t * path1_len
+){
     struct ctx_private * ctx_priv = ctx_private;
 
     for(;;){
@@ -390,7 +398,7 @@ enum libsandbox_result libsandbox_next_syscall(void * ctx_private, struct libsan
         ctx_priv->evaluated_syscall_id = CPU_REG_RW_SYSCALL_ID(ctx_priv->evaluated_cpu_regs);
 
         // functon pointer
-        int (*path_extractor_fnc)(pid_t, struct user_regs_struct *, size_t, char *, char *);
+        int (*path_extractor_fnc)(pid_t, struct user_regs_struct *, size_t, char *, size_t *, char *, size_t *);
 
         switch(ctx_priv->evaluated_syscall_id){
 
@@ -507,7 +515,7 @@ enum libsandbox_result libsandbox_next_syscall(void * ctx_private, struct libsan
 
         }
 
-        int buffers_used = path_extractor_fnc(ctx_priv->root_process_pid, & ctx_priv->evaluated_cpu_regs, path_size, path0, path1);
+        int buffers_used = path_extractor_fnc(ctx_priv->root_process_pid, & ctx_priv->evaluated_cpu_regs, path_size, path0, path0_len, path1, path1_len);
 
         if(buffers_used < 0){
 

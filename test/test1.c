@@ -97,11 +97,13 @@ int main(void){
 
     size_t path_size = 400;
     char path0[path_size];
+    size_t path0_len = 0;
     char path1[path_size];
+    size_t path1_len = 0;
 
     for(int running = 1; running;){
 
-        switch(libsandbox_next_syscall(ctx_private, & summary, path_size, path0, path1)){
+        switch(libsandbox_next_syscall(ctx_private, & summary, path_size, path0, & path0_len, path1, & path1_len)){
 
             case LIBSANDBOX_RESULT_FINISHED:{
                 running = 0;

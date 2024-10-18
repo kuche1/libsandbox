@@ -42,7 +42,15 @@ int libsandbox_fork(char * * command_argv, struct libsandbox_rules * rules, void
 
 void libsandbox_summary_init(struct libsandbox_summary * summary);
 
-enum libsandbox_result libsandbox_next_syscall(void * ctx_private, struct libsandbox_summary * summary, size_t path_size, char * path0, char * path1);
+enum libsandbox_result libsandbox_next_syscall(
+    void * ctx_private,
+    struct libsandbox_summary * summary,
+    size_t path_size,
+    char * path0,
+    size_t * path0_len,
+    char * path1,
+    size_t * path1_len
+);
 // `path0` and `path1` need to be buffers of size `path_size` each
 
 int libsandbox_syscall_allow(void * ctx_private);
