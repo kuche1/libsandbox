@@ -13,8 +13,8 @@ enum libsandbox_result{
 };
 
 enum libsandbox_rule_default{
-    LIBSANDBOX_RULE_DEFAULT_PERMISSIVE = 0, // this must stay as 0
-    LIBSANDBOX_RULE_DEFAULT_RESTRICTIVE, // this must stay as non-0
+    LIBSANDBOX_RULE_DEFAULT_RESTRICTIVE = 0, // this must stay as 0
+    LIBSANDBOX_RULE_DEFAULT_PERMISSIVE, // this must stay as non-0
 };
 
 struct libsandbox_summary{
