@@ -7,6 +7,34 @@
 
 int main(void){
 
+    {
+        char * before = "asd";
+        char after[400];
+        libsandbox_str_to_path(before, after, sizeof(after));
+        printf("before=`%s` after=`%s`\n", before, after);
+    }
+
+    {
+        char * before = "asd//dasgfcsgcregcraeg\\dfascacgr";
+        char after[400];
+        libsandbox_str_to_path(before, after, sizeof(after));
+        printf("before=`%s` after=`%s`\n", before, after);
+    }
+
+    {
+        char * before = "asd//dasgfcsgcregcraeg\\dfascacgr////////\\";
+        char after[400];
+        libsandbox_str_to_path(before, after, sizeof(after));
+        printf("before=`%s` after=`%s`\n", before, after);
+    }
+
+    {
+        char * before = "//\\\\///asd//dasgfcsgcregcraeg\\dfascacgr////////\\";
+        char after[400];
+        libsandbox_str_to_path(before, after, sizeof(after));
+        printf("before=`%s` after=`%s`\n", before, after);
+    }
+
     // char * command_argv [] = {
     //     "echo",
     //     "asd 123",

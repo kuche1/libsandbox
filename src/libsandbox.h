@@ -28,6 +28,10 @@ struct libsandbox_rules{
     int networking_allow_all;
 };
 
+ssize_t libsandbox_str_to_path(char * str, char * path, size_t path_size);
+// used for converting wishy-washy paths to paths that libsanadbox can work with
+// returns (negative on error) or (length of resulting path, without the ending \0)
+
 void libsandbox_rules_init(struct libsandbox_rules * rules, enum libsandbox_rule_default default_permissiveness);
 
 size_t libsandbox_get_ctx_private_size(void);

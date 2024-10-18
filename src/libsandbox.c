@@ -104,6 +104,69 @@ static int libsandbox_syscall_deny_inner(void * ctx_private, int automatically_b
 ////////// functions: public
 //////////
 
+// replaces windows separators (\\) with regular separators (/)
+// replaces multiple separators (eg //) with a single separator (/)
+// makes sure path doesn't end with /
+ssize_t libsandbox_str_to_path(char * str, char * path, size_t path_size){
+
+    // clean up the path
+
+    size_t path_clean_cap = path_size;
+    char path_clean[path_clean_cap];
+    size_t path_clean_len = 0;
+
+    char ch_prev = 0;
+
+    for(;;){
+
+        if(path_clean_len >= path_clean_cap){
+            fprintf(stderr, ERR_PREFIX "not enough mem in buf\n");
+            return -1;
+        }
+
+        char ch = str[0];
+
+        if(ch == '\\'){
+            ch = '/';
+        }
+
+        if((ch == '/') && (ch_prev == '/')){
+            path_clean_len -= 1;
+        }else{
+            path_clean[path_clean_len] = ch;
+        }
+
+        if(ch == 0){
+            break;
+        }
+
+        str += 1;
+
+        path_clean_len += 1;
+        ch_prev = ch;
+    }
+
+    if(path_clean_len > 0){
+        if(path_clean[path_clean_len - 1] == '/'){
+            path_clean_len -= 1;
+            path_clean[path_clean_len - 1] = 0;
+        }
+    }
+
+    // convert to real path
+
+    ssize_t path_len_or_err = extract_pathlink(getpid(), path_clean, path, path_size);
+
+    if(path_len_or_err < 0){
+        fprintf(stderr, ERR_PREFIX "`extract_pathlink` failure\n");
+        return -1;
+    }
+
+    size_t path_len = path_len_or_err;
+
+    return path_len;
+}
+
 void libsandbox_rules_init(struct libsandbox_rules * rules, enum libsandbox_rule_default default_permissiveness){
     int allow = default_permissiveness == LIBSANDBOX_RULE_DEFAULT_PERMISSIVE;
     rules->filesystem_allow_all = allow;
