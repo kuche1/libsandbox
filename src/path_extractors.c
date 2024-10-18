@@ -288,8 +288,8 @@ static ssize_t extract_pathlink_pidmemdirfd(pid_t pid, int pidmem_dirfd, char * 
 }
 
 // both `path` and `path_tmp` need to be of size `path_size`
-// returns 0 on success, otherwise something else
-static inline int extract_pidmemdirfd_pathlink(pid_t pid, int pidmem_dirfd, char * pidmem_str, size_t path_size, char * path, char * path_tmp){
+// returns (negative on err) or (length of path, excluding final \0)
+static ssize_t extract_pidmemdirfd_pathlink(pid_t pid, int pidmem_dirfd, char * pidmem_str, size_t path_size, char * path, char * path_tmp){
 
     // extract file
 
@@ -305,7 +305,7 @@ static inline int extract_pidmemdirfd_pathlink(pid_t pid, int pidmem_dirfd, char
     if(filename[0] == '/'){ // we CAN check [0] - worst case scenario it's \0
         // it's a full path
         strcpy(path, filename);
-        return 0;
+        return filename_len;
     }
 
     // extract folder
@@ -338,7 +338,7 @@ static inline int extract_pidmemdirfd_pathlink(pid_t pid, int pidmem_dirfd, char
 
     strcpy(path + path_len, filename);
 
-    return 0;
+    return path_len + filename_len;
 }
 
 //////////
@@ -365,7 +365,7 @@ static int extract_arg0dirfd_arg1pathlink(pid_t pid, struct user_regs_struct * c
     int pidmem_dirfd = CPU_REG_R_SYSCALL_ARG0(* cpu_regs);
     char * pidmem_str = (char *) CPU_REG_R_SYSCALL_ARG1(* cpu_regs);
 
-    if(extract_pidmemdirfd_pathlink(pid, pidmem_dirfd, pidmem_str, path_size, path0, path1)){
+    if(extract_pidmemdirfd_pathlink(pid, pidmem_dirfd, pidmem_str, path_size, path0, path1) < 0){
         return -1;
     }
 
@@ -413,7 +413,7 @@ static int extract_arg0pathlinkA_arg1dirfdB_arg2pathlinkB(pid_t pid, struct user
 
     char tmp[path_size];
 
-    if(extract_pidmemdirfd_pathlink(pid, pidmem_dirfd1, pidmem_str2, path_size, path1, tmp)){
+    if(extract_pidmemdirfd_pathlink(pid, pidmem_dirfd1, pidmem_str2, path_size, path1, tmp) < 0){
         return -1;
     }
 
@@ -431,7 +431,7 @@ static int extract_arg0dirfdA_arg1pathlinkA_arg2dirfdB_arg3pathlinkB(pid_t pid, 
     int pidmem_dirfd0 = CPU_REG_R_SYSCALL_ARG0(* cpu_regs);
     char * pidmem_str0 = (char *) CPU_REG_R_SYSCALL_ARG1(* cpu_regs);
 
-    if(extract_pidmemdirfd_pathlink(pid, pidmem_dirfd0, pidmem_str0, path_size, path0, tmp)){
+    if(extract_pidmemdirfd_pathlink(pid, pidmem_dirfd0, pidmem_str0, path_size, path0, tmp) < 0){
         return -1;
     }
 
