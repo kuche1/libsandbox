@@ -50,7 +50,7 @@ int main(void){
     };
 
     struct libsandbox_rules rules;
-    libsandbox_rules_init(& rules, 0); // `1` stands for permissive, `0` for non-permissive
+    libsandbox_rules_init(& rules, LIBSANDBOX_RULE_DEFAULT_RESTRICTIVE);
     // rules.filesystem_allow_metadata = 1;
     rules.networking_allow_all = 1;
 

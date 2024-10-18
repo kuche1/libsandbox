@@ -12,6 +12,11 @@ enum libsandbox_result{
     LIBSANDBOX_RESULT_ACCESS_ATTEMPT_PATH0_PATH1,
 };
 
+enum libsandbox_rule_default{
+    LIBSANDBOX_RULE_DEFAULT_PERMISSIVE = 0, // this must stay as 0
+    LIBSANDBOX_RULE_DEFAULT_RESTRICTIVE, // this must stay as non-0
+};
+
 struct libsandbox_summary{
     int return_code;
     int auto_blocked_syscalls;
@@ -25,7 +30,7 @@ struct libsandbox_rules{
 
 void libsandbox_summary_init(struct libsandbox_summary * summary);
 
-void libsandbox_rules_init(struct libsandbox_rules * rules, int permissive);
+void libsandbox_rules_init(struct libsandbox_rules * rules, enum libsandbox_rule_default default_permissiveness);
 
 size_t libsandbox_get_ctx_private_size(void);
 

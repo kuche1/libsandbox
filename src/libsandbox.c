@@ -73,10 +73,10 @@ void libsandbox_summary_init(struct libsandbox_summary * summary){
     summary->auto_blocked_syscalls = 0;
 }
 
-void libsandbox_rules_init(struct libsandbox_rules * rules, int permissive){
-    rules->filesystem_allow_all = permissive;
-    rules->filesystem_allow_metadata = permissive;
-    rules->networking_allow_all = permissive;
+void libsandbox_rules_init(struct libsandbox_rules * rules, enum libsandbox_rule_default default_permissiveness){
+    rules->filesystem_allow_all = default_permissiveness;
+    rules->filesystem_allow_metadata = default_permissiveness;
+    rules->networking_allow_all = default_permissiveness;
 }
 
 size_t libsandbox_get_ctx_private_size(void){
