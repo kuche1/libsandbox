@@ -97,9 +97,10 @@ static int libsandbox_syscall_deny_inner(void * ctx_private, int automatically_b
 //////////
 
 void libsandbox_rules_init(struct libsandbox_rules * rules, enum libsandbox_rule_default default_permissiveness){
-    rules->filesystem_allow_all = default_permissiveness;
-    rules->filesystem_allow_metadata = default_permissiveness;
-    rules->networking_allow_all = default_permissiveness;
+    int allow = default_permissiveness == LIBSANDBOX_RULE_DEFAULT_PERMISSIVE;
+    rules->filesystem_allow_all = allow;
+    rules->filesystem_allow_metadata = allow;
+    rules->networking_allow_all = allow;
 }
 
 size_t libsandbox_get_ctx_private_size(void){
