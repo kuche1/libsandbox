@@ -414,8 +414,6 @@ static int extract_arg0pathlink(
 
     * path0_len = path0_len_or_err;
 
-    printf("DBG: extract_arg0pathlink: path0=`%s`\n", path0);
-
     return 1;
 }
 
@@ -439,8 +437,6 @@ static int extract_arg0dirfd_arg1pathlink(
     }
 
     * path0_len = path0_len_or_err;
-
-    printf("DBG: extract_arg0dirfd_arg1pathlink: path0=`%s`\n", path0);
 
     return 1;
 }
