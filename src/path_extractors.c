@@ -164,31 +164,54 @@ static ssize_t extract_pathlink(pid_t pid, char * path_raw, char * path, size_t 
 
     // must be a symlink
 
-    if(path_size <= 0){
-        fprintf(stderr, ERR_PREFIX "provided buffer size is <= 0\n");
+    char * real_path = realpath(full_path, NULL); // calls malloc internally
+    if(!real_path){
+        fprintf(stderr, ERR_PREFIX "`realpath` failure\n");
         return -1;
     }
 
-    ssize_t path_dereferenced_len_or_err = readlink(full_path, path, path_size - 1);
-    int path_dereferenced_len_or_err_errno = errno;
+    size_t path0_len = 0;
+    int err = str_append_str(path, path_size, & path0_len, real_path);
+    free(real_path);
 
-    if(path_dereferenced_len_or_err < 0){
-        fprintf(stderr, ERR_PREFIX "could not dereference path `%s` (full=`%s`) (errno=%d `%s`)\n", path_raw, full_path, path_dereferenced_len_or_err_errno, strerror(path_dereferenced_len_or_err_errno));
+    if(err){
+        fprintf(stderr, ERR_PREFIX "`str_append_str` failure\n");
         return -1;
     }
 
-    size_t path_dereferenced_len = path_dereferenced_len_or_err;
+    return path0_len;
 
-    if(path_dereferenced_len == path_size - 1){
-        // it might be the case that we have just enough memory, but we can't differentiate
-        // between having just enough memory and not having enough, so we'll assume the worst
-        fprintf(stderr, ERR_PREFIX "not enough memory to dereference path `%s`\n", path_raw);
-        return -1;
-    }
+    // the old code is kept here just in case
+    // the problem with that code was the fact that
+    // `readlink` returns exactly what the link points to
+    // so if it points to `a.txt` in the same directory it will
+    // simply return `a.txt` and not the full path
 
-    path[path_dereferenced_len] = 0;
+    // if(path_size <= 0){
+    //     fprintf(stderr, ERR_PREFIX "provided buffer size is <= 0\n");
+    //     return -1;
+    // }
 
-    return path_dereferenced_len;
+    // ssize_t path_dereferenced_len_or_err = readlink(full_path, path, path_size - 1);
+    // int path_dereferenced_len_or_err_errno = errno;
+
+    // if(path_dereferenced_len_or_err < 0){
+    //     fprintf(stderr, ERR_PREFIX "could not dereference path `%s` (full=`%s`) (errno=%d `%s`)\n", path_raw, full_path, path_dereferenced_len_or_err_errno, strerror(path_dereferenced_len_or_err_errno));
+    //     return -1;
+    // }
+
+    // size_t path_dereferenced_len = path_dereferenced_len_or_err;
+
+    // if(path_dereferenced_len == path_size - 1){
+    //     // it might be the case that we have just enough memory, but we can't differentiate
+    //     // between having just enough memory and not having enough, so we'll assume the worst
+    //     fprintf(stderr, ERR_PREFIX "not enough memory to dereference path `%s`\n", path_raw);
+    //     return -1;
+    // }
+
+    // path[path_dereferenced_len] = 0;
+
+    // return path_dereferenced_len;
 
 }
 

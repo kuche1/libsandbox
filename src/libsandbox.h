@@ -5,6 +5,11 @@
 #define LIBSANDBOX_PRINT_PREFIX "libsandbox: "
 #endif
 
+// TODO ideally we would have a macro for all output, and then another INFO macro that is used everywhere so that we don't drown ourselves with guards
+#ifndef LIBSANDBOX_PRINT_BLOCKED_SYSCALLS
+#define LIBSANDBOX_PRINT_BLOCKED_SYSCALLS 0
+#endif
+
 enum libsandbox_result{
     LIBSANDBOX_RESULT_FINISHED = 0,
     LIBSANDBOX_RESULT_ERROR,

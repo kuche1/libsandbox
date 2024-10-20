@@ -14,6 +14,7 @@
 #include <fcntl.h> // AT_FDCWD
 #include <sys/stat.h> // stat
 #include <sys/socket.h> // AF_LOCAL
+#include <stdlib.h> // realpath
 
 //////////
 ////////// defines/macros
@@ -72,8 +73,16 @@ static inline void sigkill_or_print_err(pid_t pid){
     }
 }
 
-static int libsandbox_syscall_deny_inner(void * ctx_private, int automatically_blocked){
+static int libsandbox_syscall_deny_inner(
+    void * ctx_private, 
+#if !LIBSANDBOX_PRINT_BLOCKED_SYSCALLS
+    __attribute__((unused))
+#endif
+                            int automatically_blocked
+){
     struct ctx_private * ctx_priv = ctx_private;
+
+#if LIBSANDBOX_PRINT_BLOCKED_SYSCALLS
 
     const char * name = get_syscall_name(ctx_priv->evaluated_syscall_id);
 
@@ -81,6 +90,8 @@ static int libsandbox_syscall_deny_inner(void * ctx_private, int automatically_b
         printf(PRINT_PREFIX "automatically ");
     }
     printf("blocking syscall with id `%ld` (%s)\n", ctx_priv->evaluated_syscall_id, name);
+
+#endif
 
     CPU_REG_RW_SYSCALL_ID (ctx_priv->evaluated_cpu_regs) = -1; // invalidate the syscall by changing the ID
     CPU_REG_RW_SYSCALL_RET(ctx_priv->evaluated_cpu_regs) = -1; // also put bad return code, suprisingly this fixes some programs (example: python3)
