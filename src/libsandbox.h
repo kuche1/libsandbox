@@ -36,7 +36,7 @@ struct libsandbox_rules{
 ssize_t libsandbox_str_to_path(char * str, char * path, size_t path_size);
 // used for converting wishy-washy paths to paths that libsanadbox can work with
 // returns (negative on error) or (length of resulting path, without the ending \0)
-// TODO this is actually wrong, it actually CAN BE THE CASE that a syscall uses a symlink and not a full path as an argument (abviously)
+// TODO this is actually wrong, it actually CAN BE THE CASE that a syscall uses a symlink and not a full path as an argument (abviously) AND THIS CAN BE FIXED, THE APPROPRIATE FUNCTINO NEEDS TO BE FIXED
 
 void libsandbox_rules_init(struct libsandbox_rules * rules, enum libsandbox_rule_default default_permissiveness);
 
