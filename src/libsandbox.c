@@ -159,8 +159,8 @@ ssize_t libsandbox_str_to_path(char * str, char * path, size_t path_size){
 
     if(path_clean_len > 0){
         if(path_clean[path_clean_len - 1] == '/'){
-            path_clean_len -= 1;
             path_clean[path_clean_len - 1] = 0;
+            path_clean_len -= 1;
         }
     }
 
