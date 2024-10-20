@@ -325,43 +325,65 @@ static ssize_t extract_pidmemdirfd_pathlink(pid_t pid, int pidmem_dirfd, char * 
         return -1;
     }
 
+    size_t full_path_cap = path_size;
+    char full_path[full_path_cap];
+    size_t full_path_len = 0;
+
     if(filename[0] == '/'){ // we CAN check [0] - worst case scenario it's \0
         // it's a full path
-        strcpy(path, filename);
-        return filename_len;
+
+        if(str_append_str(full_path, full_path_cap, & full_path_len, filename)){
+            fprintf(stderr, ERR_PREFIX "`str_append_str` failure\n");
+            return -1;
+        }
+
+    }else{
+
+        // extract folder
+
+        ssize_t full_path_len_ssize = extract_pathlink_pidmemdirfd(pid, pidmem_dirfd, full_path, full_path_cap);
+
+        if(full_path_len_ssize < 0){
+            fprintf(stderr, ERR_PREFIX "`extract_pathlink_pidmemdirfd` failure\n");
+            return -1;
+        }
+
+        full_path_len = full_path_len_ssize;
+
+        // add separator
+
+        full_path[full_path_len] = '/';
+        full_path_len += 1;
+
+        if(full_path_len >= full_path_cap){
+            fprintf(stderr, ERR_PREFIX "not enough memory in buffer\n");
+            return -1;
+        }
+
+        // add file
+
+        if(full_path_len + filename_len + 1 >= full_path_cap){
+            fprintf(stderr, ERR_PREFIX "not enough memory in buffer\n");
+            return -1;
+        }
+
+        strcpy(full_path + full_path_len, filename);
+
+        full_path_len += filename_len;
+
     }
 
-    // extract folder
+    ssize_t path_len_or_err = extract_pathlink(pid, full_path, path, path_size);
+    // TODO the more I think about this, the better of an idea it seems that `extract_pathlink` should take a dirfd arg, also we're repeating ourselves a lot (the fullpath buf)
 
-    ssize_t path_len_ssize = extract_pathlink_pidmemdirfd(pid, pidmem_dirfd, path, path_size);
-
-    if(path_len_ssize < 0){
-        fprintf(stderr, ERR_PREFIX "call to `extract_pathlink_pidmemdirfd` failed\n");
+    if(path_len_or_err < 0){
+        fprintf(stderr, ERR_PREFIX "`extract_pathlink` failure\n");
         return -1;
     }
 
-    size_t path_len = path_len_ssize;
+    size_t path_len = path_len_or_err;
 
-    // add separator
-
-    path[path_len] = '/';
-    path_len += 1;
-
-    if(path_len >= path_size){
-        fprintf(stderr, ERR_PREFIX "not enough memory in buffer\n");
-        return -1;
-    }
-
-    // add file
-
-    if(path_len + filename_len + 1 >= path_size){
-        fprintf(stderr, ERR_PREFIX "not enough memory in buffer\n");
-        return -1;
-    }
-
-    strcpy(path + path_len, filename);
-
-    return path_len + filename_len;
+    return path_len;
 }
 
 //////////
@@ -392,6 +414,8 @@ static int extract_arg0pathlink(
 
     * path0_len = path0_len_or_err;
 
+    printf("DBG: extract_arg0pathlink: path0=`%s`\n", path0);
+
     return 1;
 }
 
@@ -415,6 +439,8 @@ static int extract_arg0dirfd_arg1pathlink(
     }
 
     * path0_len = path0_len_or_err;
+
+    printf("DBG: extract_arg0dirfd_arg1pathlink: path0=`%s`\n", path0);
 
     return 1;
 }
