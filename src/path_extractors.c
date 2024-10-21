@@ -28,7 +28,7 @@ static int is_symlink(char * path){
 }
 
 // return: (negative on err) or (number of bytes written excluding \0)
-static ssize_t extract_cwd(pid_t pid, size_t path_size, char * path){
+static ssize_t get_process_cwd(pid_t pid, size_t path_size, char * path){
 
     char link_to_cwd[100];
 
@@ -130,7 +130,7 @@ static ssize_t extract_pathlink(pid_t pid, char * path_raw, char * path, size_t 
 
     }else{
 
-        ssize_t full_path_len_or_err = extract_cwd(pid, sizeof(full_path), full_path);
+        ssize_t full_path_len_or_err = get_process_cwd(pid, sizeof(full_path), full_path);
         if(full_path_len_or_err < 0){
             fprintf(stderr, ERR_PREFIX "could not extract cwd of process with pid `%d`\n", pid);
             return -1;
@@ -238,7 +238,7 @@ static ssize_t extract_pathlink_pidmemstr(pid_t pid, char * pidmem_str, char * p
 static ssize_t extract_pathlink_pidmemdirfd(pid_t pid, int pidmem_dirfd, char * path, size_t path_size){
 
     if(pidmem_dirfd == AT_FDCWD){
-        return extract_cwd(pid, path_size, path);
+        return get_process_cwd(pid, path_size, path);
     }
 
     printf("DBG: YEEEEE");
