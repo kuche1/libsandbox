@@ -235,7 +235,7 @@ static ssize_t pidmemstr_to_path(pid_t pid, char * pidmem_str, char * path, size
 }
 
 // returns (negative on error) or (number of bytes written, excluding ending \0)
-static ssize_t extract_pathlink_pidmemdirfd(pid_t pid, int pidmem_dirfd, char * path, size_t path_size){
+static ssize_t pidmemdirfd_to_path(pid_t pid, int pidmem_dirfd, char * path, size_t path_size){
 
     if(pidmem_dirfd == AT_FDCWD){
         return get_process_cwd(pid, path_size, path);
@@ -342,10 +342,10 @@ static ssize_t extract_pidmemdirfd_pathlink(pid_t pid, int pidmem_dirfd, char * 
 
         // extract folder
 
-        ssize_t full_path_len_ssize = extract_pathlink_pidmemdirfd(pid, pidmem_dirfd, full_path, full_path_cap);
+        ssize_t full_path_len_ssize = pidmemdirfd_to_path(pid, pidmem_dirfd, full_path, full_path_cap);
 
         if(full_path_len_ssize < 0){
-            fprintf(stderr, ERR_PREFIX "`extract_pathlink_pidmemdirfd` failure\n");
+            fprintf(stderr, ERR_PREFIX "`pidmemdirfd_to_path` failure\n");
             return -1;
         }
 
