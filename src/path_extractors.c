@@ -217,7 +217,7 @@ static ssize_t str_to_path(pid_t pid, char * path_raw, char * path, size_t path_
 }
 
 // returns (negative on error) or (number of bytes written, excluding ending \0)
-static ssize_t extract_pathlink_pidmemstr(pid_t pid, char * pidmem_str, char * path, size_t path_size){
+static ssize_t pidmemstr_to_path(pid_t pid, char * pidmem_str, char * path, size_t path_size){
 
     char path_raw[path_size];
 
@@ -406,10 +406,10 @@ static int extract_arg0pathlink(
 
     char * pidmem_str = (char *) CPU_REG_R_SYSCALL_ARG0(* cpu_regs);
 
-    ssize_t path0_len_or_err = extract_pathlink_pidmemstr(pid, pidmem_str, path0, path_size);
+    ssize_t path0_len_or_err = pidmemstr_to_path(pid, pidmem_str, path0, path_size);
 
     if(path0_len_or_err < 0){
-        fprintf(stderr, ERR_PREFIX "call to `extract_pathlink_pidmemstr` failed\n");
+        fprintf(stderr, ERR_PREFIX "call to `pidmemstr_to_path` failed\n");
         return -1;
     }
 
@@ -457,7 +457,7 @@ static int extract_arg0pathlink_arg1pathlink(
 
     char * pidmem_str0 = (char *) CPU_REG_R_SYSCALL_ARG0(* cpu_regs);
 
-    ssize_t path0_len_or_err = extract_pathlink_pidmemstr(pid, pidmem_str0, path0, path_size);
+    ssize_t path0_len_or_err = pidmemstr_to_path(pid, pidmem_str0, path0, path_size);
 
     if(path0_len_or_err < 0){
         return -1;
@@ -469,7 +469,7 @@ static int extract_arg0pathlink_arg1pathlink(
 
     char * pidmem_str1 = (char *) CPU_REG_R_SYSCALL_ARG1(* cpu_regs);
 
-    ssize_t path1_len_or_err = extract_pathlink_pidmemstr(pid, pidmem_str1, path1, path_size);
+    ssize_t path1_len_or_err = pidmemstr_to_path(pid, pidmem_str1, path1, path_size);
 
     if(path1_len_or_err < 0){
         return -1;
@@ -496,7 +496,7 @@ static int extract_arg0pathlinkA_arg1dirfdB_arg2pathlinkB(
 
     char * pidmem_str0 = (char *) CPU_REG_R_SYSCALL_ARG0(* cpu_regs);
 
-    ssize_t path0_len_or_err = extract_pathlink_pidmemstr(pid, pidmem_str0, path0, path_size);
+    ssize_t path0_len_or_err = pidmemstr_to_path(pid, pidmem_str0, path0, path_size);
 
     if(path0_len_or_err < 0){
         return -1;
