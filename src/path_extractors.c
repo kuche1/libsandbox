@@ -113,6 +113,7 @@ static ssize_t extract_pathraw_addr(pid_t pid, char * addr, char * path, size_t 
 }
 
 // returns: (negative on error) or (number of bytes written, excluding ending \0)
+// TODO the path needs to be sanitised - it is in fact a user input
 static ssize_t extract_pathlink(pid_t pid, char * path_raw, char * path, size_t path_size){
 
     char full_path[path_size];
