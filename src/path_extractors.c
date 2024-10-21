@@ -67,7 +67,7 @@ static ssize_t get_process_cwd(pid_t pid, size_t path_size, char * path){
 }
 
 // returns how much bytes have been written (excluding the last \0), or negative if error
-static ssize_t extract_pathraw_addr(pid_t pid, char * addr, char * path, size_t path_size){
+static ssize_t read_str_from_process_memory(pid_t pid, char * addr, char * path, size_t path_size){
 
     size_t bytes_read = 0;
 
@@ -221,8 +221,8 @@ static ssize_t extract_pathlink_pidmemstr(pid_t pid, char * pidmem_str, char * p
 
     char path_raw[path_size];
 
-    if(extract_pathraw_addr(pid, pidmem_str, path_raw, sizeof(path_raw)) < 0){
-        fprintf(stderr, ERR_PREFIX "call to `extract_pathraw_addr` failed\n");
+    if(read_str_from_process_memory(pid, pidmem_str, path_raw, sizeof(path_raw)) < 0){
+        fprintf(stderr, ERR_PREFIX "call to `read_str_from_process_memory` failed\n");
         return -1;
     }
 
@@ -319,7 +319,7 @@ static ssize_t extract_pidmemdirfd_pathlink(pid_t pid, int pidmem_dirfd, char * 
 
     char * filename = path_tmp;
 
-    ssize_t filename_len = extract_pathraw_addr(pid, pidmem_str, filename, path_size);
+    ssize_t filename_len = read_str_from_process_memory(pid, pidmem_str, filename, path_size);
 
     if(filename_len < 0){
         fprintf(stderr, ERR_PREFIX "not enough memory in buffer\n");
