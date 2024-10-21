@@ -166,10 +166,10 @@ ssize_t libsandbox_str_to_path(char * str, char * path, size_t path_size){
 
     // convert to real path
 
-    ssize_t path_len_or_err = extract_pathlink(getpid(), path_clean, path, path_size);
+    ssize_t path_len_or_err = str_to_path(getpid(), path_clean, path, path_size);
 
     if(path_len_or_err < 0){
-        fprintf(stderr, ERR_PREFIX "`extract_pathlink` failure\n");
+        fprintf(stderr, ERR_PREFIX "`str_to_path` failure\n");
         return -1;
     }
 
