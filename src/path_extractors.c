@@ -4,6 +4,7 @@
 // to be expanded in the case of a symlink pointing to a symlink pointing to ...) (altho this method could lead to false
 // positives (imagine you are working on a symlink that points outside of your allowed directory))
 
+// TODO those are stupid, make it so that `pathraw` is never used and `pathlink` is replaced with just `path`
 // `pathraw` - treat a path as it is (do not try to dereference)
 // `pathlink` - try to dereference, and if it doesn't work (eg you can't dererefence a non-existant symlink) trat as it is
 
