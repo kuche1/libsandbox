@@ -114,7 +114,7 @@ static ssize_t read_str_from_process_memory(pid_t pid, char * addr, char * path,
 
 // returns: (negative on error) or (number of bytes written, excluding ending \0)
 // TODO the path needs to be sanitised - it is in fact a user input
-static ssize_t extract_pathlink(pid_t pid, char * path_raw, char * path, size_t path_size){
+static ssize_t str_to_path(pid_t pid, char * path_raw, char * path, size_t path_size){
 
     char full_path[path_size];
     size_t full_path_len = 0;
@@ -226,9 +226,9 @@ static ssize_t extract_pathlink_pidmemstr(pid_t pid, char * pidmem_str, char * p
         return -1;
     }
 
-    ssize_t ret = extract_pathlink(pid, path_raw, path, path_size);
+    ssize_t ret = str_to_path(pid, path_raw, path, path_size);
     if(ret < 0){
-        fprintf(stderr, ERR_PREFIX "call to `extract_pathlink` failed\n");
+        fprintf(stderr, ERR_PREFIX "call to `str_to_path` failed\n");
     }
 
     return ret;
@@ -374,11 +374,11 @@ static ssize_t extract_pidmemdirfd_pathlink(pid_t pid, int pidmem_dirfd, char * 
 
     }
 
-    ssize_t path_len_or_err = extract_pathlink(pid, full_path, path, path_size);
-    // TODO the more I think about this, the better of an idea it seems that `extract_pathlink` should take a dirfd arg, also we're repeating ourselves a lot (the fullpath buf)
+    ssize_t path_len_or_err = str_to_path(pid, full_path, path, path_size);
+    // TODO the more I think about this, the better of an idea it seems that `str_to_path` should take a dirfd arg, also we're repeating ourselves a lot (the fullpath buf)
 
     if(path_len_or_err < 0){
-        fprintf(stderr, ERR_PREFIX "`extract_pathlink` failure\n");
+        fprintf(stderr, ERR_PREFIX "`str_to_path` failure\n");
         return -1;
     }
 
