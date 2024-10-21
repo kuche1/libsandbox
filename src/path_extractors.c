@@ -114,7 +114,7 @@ static ssize_t read_str_from_process_memory(pid_t pid, char * addr, char * path,
 
 // returns: (negative on error) or (number of bytes written, excluding ending \0)
 // TODO the path needs to be sanitised - it is in fact a user input
-static ssize_t str_to_path(pid_t pid, char * path_raw, char * path, size_t path_size){
+static ssize_t extract_pathlink(pid_t pid, char * path_raw, char * path, size_t path_size){
 
     char full_path[path_size];
     size_t full_path_len = 0;
@@ -217,7 +217,7 @@ static ssize_t str_to_path(pid_t pid, char * path_raw, char * path, size_t path_
 }
 
 // returns (negative on error) or (number of bytes written, excluding ending \0)
-static ssize_t str_to_path_pidmemstr(pid_t pid, char * pidmem_str, char * path, size_t path_size){
+static ssize_t extract_pathlink_pidmemstr(pid_t pid, char * pidmem_str, char * path, size_t path_size){
 
     char path_raw[path_size];
 
@@ -226,16 +226,16 @@ static ssize_t str_to_path_pidmemstr(pid_t pid, char * pidmem_str, char * path, 
         return -1;
     }
 
-    ssize_t ret = str_to_path(pid, path_raw, path, path_size);
+    ssize_t ret = extract_pathlink(pid, path_raw, path, path_size);
     if(ret < 0){
-        fprintf(stderr, ERR_PREFIX "call to `str_to_path` failed\n");
+        fprintf(stderr, ERR_PREFIX "call to `extract_pathlink` failed\n");
     }
 
     return ret;
 }
 
 // returns (negative on error) or (number of bytes written, excluding ending \0)
-static ssize_t str_to_path_pidmemdirfd(pid_t pid, int pidmem_dirfd, char * path, size_t path_size){
+static ssize_t extract_pathlink_pidmemdirfd(pid_t pid, int pidmem_dirfd, char * path, size_t path_size){
 
     if(pidmem_dirfd == AT_FDCWD){
         return get_process_cwd(pid, path_size, path);
@@ -342,10 +342,10 @@ static ssize_t extract_pidmemdirfd_pathlink(pid_t pid, int pidmem_dirfd, char * 
 
         // extract folder
 
-        ssize_t full_path_len_ssize = str_to_path_pidmemdirfd(pid, pidmem_dirfd, full_path, full_path_cap);
+        ssize_t full_path_len_ssize = extract_pathlink_pidmemdirfd(pid, pidmem_dirfd, full_path, full_path_cap);
 
         if(full_path_len_ssize < 0){
-            fprintf(stderr, ERR_PREFIX "`str_to_path_pidmemdirfd` failure\n");
+            fprintf(stderr, ERR_PREFIX "`extract_pathlink_pidmemdirfd` failure\n");
             return -1;
         }
 
@@ -374,11 +374,11 @@ static ssize_t extract_pidmemdirfd_pathlink(pid_t pid, int pidmem_dirfd, char * 
 
     }
 
-    ssize_t path_len_or_err = str_to_path(pid, full_path, path, path_size);
-    // TODO the more I think about this, the better of an idea it seems that `str_to_path` should take a dirfd arg, also we're repeating ourselves a lot (the fullpath buf)
+    ssize_t path_len_or_err = extract_pathlink(pid, full_path, path, path_size);
+    // TODO the more I think about this, the better of an idea it seems that `extract_pathlink` should take a dirfd arg, also we're repeating ourselves a lot (the fullpath buf)
 
     if(path_len_or_err < 0){
-        fprintf(stderr, ERR_PREFIX "`str_to_path` failure\n");
+        fprintf(stderr, ERR_PREFIX "`extract_pathlink` failure\n");
         return -1;
     }
 
@@ -406,10 +406,10 @@ static int extract_arg0pathlink(
 
     char * pidmem_str = (char *) CPU_REG_R_SYSCALL_ARG0(* cpu_regs);
 
-    ssize_t path0_len_or_err = str_to_path_pidmemstr(pid, pidmem_str, path0, path_size);
+    ssize_t path0_len_or_err = extract_pathlink_pidmemstr(pid, pidmem_str, path0, path_size);
 
     if(path0_len_or_err < 0){
-        fprintf(stderr, ERR_PREFIX "call to `str_to_path_pidmemstr` failed\n");
+        fprintf(stderr, ERR_PREFIX "call to `extract_pathlink_pidmemstr` failed\n");
         return -1;
     }
 
@@ -457,7 +457,7 @@ static int extract_arg0pathlink_arg1pathlink(
 
     char * pidmem_str0 = (char *) CPU_REG_R_SYSCALL_ARG0(* cpu_regs);
 
-    ssize_t path0_len_or_err = str_to_path_pidmemstr(pid, pidmem_str0, path0, path_size);
+    ssize_t path0_len_or_err = extract_pathlink_pidmemstr(pid, pidmem_str0, path0, path_size);
 
     if(path0_len_or_err < 0){
         return -1;
@@ -469,7 +469,7 @@ static int extract_arg0pathlink_arg1pathlink(
 
     char * pidmem_str1 = (char *) CPU_REG_R_SYSCALL_ARG1(* cpu_regs);
 
-    ssize_t path1_len_or_err = str_to_path_pidmemstr(pid, pidmem_str1, path1, path_size);
+    ssize_t path1_len_or_err = extract_pathlink_pidmemstr(pid, pidmem_str1, path1, path_size);
 
     if(path1_len_or_err < 0){
         return -1;
@@ -496,7 +496,7 @@ static int extract_arg0pathlinkA_arg1dirfdB_arg2pathlinkB(
 
     char * pidmem_str0 = (char *) CPU_REG_R_SYSCALL_ARG0(* cpu_regs);
 
-    ssize_t path0_len_or_err = str_to_path_pidmemstr(pid, pidmem_str0, path0, path_size);
+    ssize_t path0_len_or_err = extract_pathlink_pidmemstr(pid, pidmem_str0, path0, path_size);
 
     if(path0_len_or_err < 0){
         return -1;
